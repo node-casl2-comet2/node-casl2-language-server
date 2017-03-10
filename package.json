@@ -1,0 +1,31 @@
+{
+  "name": "@maxfield/node-casl2-language-server",
+  "version": "0.0.1",
+  "description": "",
+  "main": "dist/src/server.js",
+  "author": "Maxfield Walker",
+  "license": "MIT",
+  "scripts": {
+    "compile": "node ./node_modules/typescript/bin/tsc -p .",
+    "watch": "node ./node_modules/typescript/bin/tsc -w -p .",
+    "test": "npm run compile && mocha",
+    "test:coverage": "npm run compile && istanbul cover ./node_modules/mocha/bin/_mocha -- --no-timeouts && remap-istanbul --input ./coverage/coverage.json --output ./coverage/lcov.ts.info --type lcovonly",
+    "prepublish": "npm run compile",
+    "installServer": "installServerIntoExtension ../../dist/src ./package.json ./tsconfig.json && tsc -p ."
+  },
+  "devDependencies": {
+    "@types/lodash": "^4.14.53",
+    "@types/mocha": "^2.2.32",
+    "@types/node": "^6.0.40",
+    "coveralls": "^2.12.0",
+    "istanbul": "^0.4.5",
+    "lodash": "^4.17.4",
+    "mocha": "^2.3.3",
+    "remap-istanbul": "^0.9.1",
+    "typescript": "^2.2.1"
+  },
+  "dependencies": {
+    "@maxfield/node-casl2-core": "^1.0.1",
+    "vscode-languageserver": "^3.1.0"
+  }
+}
