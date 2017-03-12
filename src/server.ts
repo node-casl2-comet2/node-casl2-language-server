@@ -6,9 +6,10 @@ import {
     createConnection, IConnection, TextDocumentSyncKind,
     TextDocuments, TextDocument, Diagnostic, DiagnosticSeverity,
     InitializeParams, InitializeResult, TextDocumentPositionParams,
-    CompletionItem, CompletionItemKind
+    CompletionItem, CompletionItemKind, Position,
+    SignatureHelp
 } from "vscode-languageserver";
-import { validateSource } from "./casl2";
+import { validateSource, completion } from "./casl2";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -41,6 +42,50 @@ connection.onInitialize((params): InitializeResult => {
 // このイベントはファイルが最初に開かれた時と内容が変更された時に発行される。
 documents.onDidChangeContent(change => validateTextDocument(change.document));
 
+// 補完を提供する
+connection.onCompletion(textDocumentPosition => completion(textDocumentPosition.position));
+
+connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
+    const help: SignatureHelp = {
+        signatures: [
+            {
+                // ラベルにパラメーター名を含ませておくと
+                // vscodeがアクティブなパラメーターを太字にしてくれる
+                label: "hello(r1, r2)",
+                documentation: "hello doc",
+                parameters: [
+                    {
+                        label: "r1",
+                        documentation: "aaa"
+                    },
+                    {
+                        label: "r2",
+                        documentation: "bbb"
+                    }
+                ]
+            },
+            {
+                label: "hello2(r3, r4)",
+                documentation: "hello2 doc",
+                parameters: [
+                    {
+                        label: "r3",
+                        documentation: "ccc"
+                    },
+                    {
+                        label: "r4",
+                        documentation: "ddd"
+                    }
+                ]
+            }
+        ],
+        activeParameter: 0,
+        activeSignature: 0
+    };
+
+    return help;
+});
+
 // サーバー関連の設定部分のインターフェース
 interface Settings {
     languageServerExample: ServerSettings;
@@ -61,6 +106,8 @@ connection.onDidChangeConfiguration((change) => {
 
 // テキストファイルを検証する
 function validateTextDocument(textDocument: TextDocument): void {
+    console.log("ON CHANGE CONTENT");
+
     // 行のリストにする
     const lines = textDocument.getText().split(/\r?\n/g);
 
@@ -73,13 +120,6 @@ function validateTextDocument(textDocument: TextDocument): void {
 connection.onDidChangeWatchedFiles((change) => {
     // 監視しているファイルがvscodeで変更された
     connection.console.log("We recevied an file change event");
-});
-
-// 補完の最初のリストを提供する
-connection.onCompletion((textDocumentPosition: TextDocumentPositionParams): CompletionItem[] => {
-    // passパラメータはコード補完がリクエストされたファイルの位置を含む。
-    return [
-    ]
 });
 
 // 追加の情報を補完リストに与える
