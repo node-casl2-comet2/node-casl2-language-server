@@ -7,9 +7,9 @@ import {
     TextDocuments, TextDocument, Diagnostic, DiagnosticSeverity,
     InitializeParams, InitializeResult, TextDocumentPositionParams,
     CompletionItem, CompletionItemKind, Position,
-    SignatureHelp
+    SignatureHelp, Location
 } from "vscode-languageserver";
-import { validateSource, completion } from "./casl2";
+import { validateSource, completion, gotoDefinition } from "./casl2";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -32,8 +32,10 @@ connection.onInitialize((params): InitializeResult => {
             textDocumentSync: documents.syncKind,
             // クライアントにサーバーがコード補完に対応していることを伝える
             completionProvider: {
-                resolveProvider: true
-            }
+                resolveProvider: false
+            },
+            // goto definitionが使えるか
+            definitionProvider: true
         }
     }
 });
@@ -44,6 +46,9 @@ documents.onDidChangeContent(change => validateTextDocument(change.document));
 
 // 補完を提供する
 connection.onCompletion(textDocumentPosition => completion(textDocumentPosition.position));
+
+// 定義へ移動を提供する
+connection.onDefinition(({ textDocument, position }) => gotoDefinition(textDocument.uri, position));
 
 connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
     const help: SignatureHelp = {

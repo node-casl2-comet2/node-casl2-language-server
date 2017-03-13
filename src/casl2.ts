@@ -8,7 +8,10 @@ import {
     instructionCompletionItems, grCompletionItems, indexGRCompletionItems,
     createLabelCompletionItems
 } from "./completion";
-import { Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position } from "vscode-languageserver";
+import {
+    Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
+    Location, Range
+} from "vscode-languageserver";
 import { instructionMap, isAddressToken } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
 
@@ -93,7 +96,7 @@ export function completion(position: Position): Array<CompletionItem> {
             const beforeCursorTokens = getTokensBeforeCursor(tokens, position.character);
 
             function labelCompletionItems(): Array<CompletionItem> {
-                const labels = lastDiagnosticsResult.getAllReferenceableLabels(position.line);
+                const labels = getAllReferenceableLabels(position).map(x => x.value);
                 return createLabelCompletionItems(labels);
             }
 
@@ -264,4 +267,69 @@ function label_space(tokens: Array<TokenInfo>, position: Position): boolean {
 function getTokensBeforeCursor(tokens: Array<TokenInfo>, cursorIndex: number) {
     const filtered = tokens.filter(x => x.endIndex < cursorIndex);
     return filtered;
+}
+
+export function gotoDefinition(uri: string, position: Position): Location | Array<Location> {
+    const noDefinitions: Array<Location> = [];
+    if (lastDiagnosticsResult === undefined) return noDefinitions;
+    // カーソル位置にあるトークンを取得する
+    const labelToken = getTokenOfTypeAtPosition(lastDiagnosticsResult.tokensMap, TokenType.TLABEL, position);
+    if (labelToken === undefined) return noDefinitions;
+
+    const labels = getAllReferenceableLabels(position);
+    const token = labels.find(x => x.value == labelToken.value);
+
+    if (token === undefined) return noDefinitions;
+
+    const location: Location = {
+        uri: uri,
+        range: createRangeFromTokenInfo(token)
+    };
+
+    return location;
+}
+
+function getTokenOfTypeAtPosition(tokensMap: Map<number, Array<TokenInfo>>, type: TokenType, position: Position): TokenInfo | undefined {
+    const tokens = getTokensAtPosition(tokensMap, position);
+    if (tokens === undefined) return undefined;
+
+    const filtered = tokens.filter(x => x.type == type);
+    if (filtered.length == 0) return undefined;
+
+    return filtered[filtered.length - 1];
+}
+
+function getTokensAtPosition(tokensMap: Map<number, Array<TokenInfo>>, position: Position): Array<TokenInfo> | undefined {
+    const lineTokens = tokensMap.get(position.line);
+    if (lineTokens === undefined) return undefined;
+
+    const tokens = lineTokens.filter(x => x.startIndex <= position.character && position.character <= x.endIndex);
+    return tokens;
+}
+
+function createRangeFromTokenInfo(token: TokenInfo): Range {
+    const { line, startIndex, endIndex } = token;
+    return {
+        start: {
+            line: line,
+            character: startIndex
+        },
+        end: {
+            line: line,
+            character: endIndex
+        }
+    };
+}
+
+function getScopeFromPosition(position: Position) {
+    return lastDiagnosticsResult.scopeMap.get(position.line);
+}
+
+function getAllReferenceableLabels(position: Position): Array<TokenInfo> {
+    const scope = getScopeFromPosition(position);
+    if (scope !== undefined) {
+        return lastDiagnosticsResult.labelMap.getAllReferenceableLabels(scope);
+    } else {
+        return [];
+    }
 }
