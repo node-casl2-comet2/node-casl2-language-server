@@ -92,14 +92,9 @@ export function completion(position: Position): Array<CompletionItem> {
             if (info === undefined) throw new Error();
             const beforeCursorTokens = getTokensBeforeCursor(tokens, position.character);
 
-            let labelCompletionItemsCache: Array<CompletionItem>;
-            function labelCompletionItems() {
-                if (labelCompletionItemsCache === undefined) {
-                    const list = lastDiagnosticsResult.getAllReferenceableLabel(position.line);
-                    labelCompletionItemsCache = createLabelCompletionItems(list);
-                }
-
-                return labelCompletionItemsCache;
+            function labelCompletionItems(): Array<CompletionItem> {
+                const labels = lastDiagnosticsResult.getAllReferenceableLabel(position.line);
+                return createLabelCompletionItems(labels);
             }
 
             function instSpaceTrailing(...tokenTypes: Array<TokenType>): boolean {
