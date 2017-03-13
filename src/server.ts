@@ -32,7 +32,8 @@ connection.onInitialize((params): InitializeResult => {
             textDocumentSync: documents.syncKind,
             // クライアントにサーバーがコード補完に対応していることを伝える
             completionProvider: {
-                resolveProvider: false
+                resolveProvider: false,
+                triggerCharacters: [",", " "]
             },
             // goto definitionが使えるか
             definitionProvider: true

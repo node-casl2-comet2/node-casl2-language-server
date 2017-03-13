@@ -93,7 +93,7 @@ export function completion(position: Position): Array<CompletionItem> {
             const inst = instToken.value;
             const info = instructionMap.get(inst);
             if (info === undefined) throw new Error();
-            const beforeCursorTokens = getTokensBeforeCursor(tokens, position.character);
+            const beforeCursorTokens = getTokensBeforePosition(tokens, position.character);
 
             function labelCompletionItems(): Array<CompletionItem> {
                 const labels = getAllReferenceableLabels(position).map(x => x.value);
@@ -236,7 +236,7 @@ export function completion(position: Position): Array<CompletionItem> {
 }
 
 function space(tokens: Array<TokenInfo>, position: Position): boolean {
-    const filtered = getTokensBeforeCursor(tokens, position.character);
+    const filtered = getTokensBeforePosition(tokens, position.character);
     if (filtered.length == 1) {
         const [first] = filtered;
         return first.type == TokenType.TSPACE;
@@ -255,7 +255,7 @@ function startOfLine(tokens: Array<TokenInfo>) {
 }
 
 function label_space(tokens: Array<TokenInfo>, position: Position): boolean {
-    const t = getTokensBeforeCursor(tokens, position.character);
+    const t = getTokensBeforePosition(tokens, position.character);
     if (t.length >= 2) {
         const [l1, l2] = t.slice(t.length - 2);
         return l1.type == TokenType.TLABEL && l2.type == TokenType.TSPACE;
@@ -264,8 +264,12 @@ function label_space(tokens: Array<TokenInfo>, position: Position): boolean {
     return false;
 }
 
-function getTokensBeforeCursor(tokens: Array<TokenInfo>, cursorIndex: number) {
-    const filtered = tokens.filter(x => x.endIndex < cursorIndex);
+function getTokensBeforePosition(tokens: Array<TokenInfo>, cursorIndex: number) {
+    const filtered = tokens.filter(x => x.endIndex <= cursorIndex);
+    const last = filtered[filtered.length - 1];
+    if (!(last.type == TokenType.TCOMMASPACE || last.type == TokenType.TSPACE)) {
+        filtered.pop();
+    }
     return filtered;
 }
 
