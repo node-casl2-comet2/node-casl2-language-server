@@ -93,7 +93,7 @@ export function completion(position: Position): Array<CompletionItem> {
             const beforeCursorTokens = getTokensBeforeCursor(tokens, position.character);
 
             function labelCompletionItems(): Array<CompletionItem> {
-                const labels = lastDiagnosticsResult.getAllReferenceableLabel(position.line);
+                const labels = lastDiagnosticsResult.getAllReferenceableLabels(position.line);
                 return createLabelCompletionItems(labels);
             }
 
@@ -136,38 +136,33 @@ export function completion(position: Position): Array<CompletionItem> {
                     // 何も補完しない
                     break;
 
+                case ArgumentType.label_START:
+                    // e.g. START |
+                    if (instSpace()) {
+                        return labelCompletionItems();
+                    }
+                    break;
 
-                case ArgumentType.other:
-                    switch (info.instructionName) {
-                        case "START":
-                            // e.g. START |
-                            if (instSpace()) {
+                case ArgumentType.decimal_DS:
+                    // 何も補完しない
+                    break;
+
+                case ArgumentType.constants_DC:
+                    // e.g. DC |
+                    if (instSpace()) {
+                        return labelCompletionItems();
+                    }
+                    // e.g. DC 1, |
+                    // DCは任意長のオペランドをもつので
+                    // カーソルの左側に命令があって，かつカーソルの直前のトークンが
+                    // TCOMMASPACEの時補完を出すことにしている
+                    if (beforeCursorTokens.indexOf(instToken) != -1) {
+                        if (beforeCursorTokens.length >= 1) {
+                            const [l1] = beforeCursorTokens.slice(beforeCursorTokens.length - 1);
+                            if (l1.type == TokenType.TCOMMASPACE) {
                                 return labelCompletionItems();
                             }
-                            break;
-                        case "DS":
-                            // 何も補完しない
-                            break;
-                        case "DC":
-                            // e.g. DC |
-                            if (instSpace()) {
-                                return labelCompletionItems();
-                            }
-                            // e.g. DC 1, |
-                            // DCは任意長のオペランドをもつので
-                            // カーソルの左側に命令があって，かつカーソルの直前のトークンが
-                            // TCOMMASPACEの時補完を出すことにしている
-                            if (beforeCursorTokens.indexOf(instToken) != -1) {
-                                if (beforeCursorTokens.length >= 1) {
-                                    const [l1] = beforeCursorTokens.slice(beforeCursorTokens.length - 1);
-                                    if (l1.type == TokenType.TCOMMASPACE) {
-                                        return labelCompletionItems();
-                                    }
-                                }
-                            }
-                            break;
-                        default:
-                            throw new Error();
+                        }
                     }
                     break;
 
