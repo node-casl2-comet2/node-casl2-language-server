@@ -11,7 +11,7 @@ import {
 } from "vscode-languageserver";
 import {
     validateSource, completion, gotoDefinition, findAllReferences,
-    documentHighlight, rename, documentSymbol
+    documentHighlight, rename, documentSymbol, hover
 } from "./casl2";
 
 // サーバー用のコネクションを作成する
@@ -47,7 +47,9 @@ connection.onInitialize((params): InitializeResult => {
             // 同一シンボルを一度にリネームする
             renameProvider: true,
             // 関数などの定義にジャンプできるようにする
-            documentSymbolProvider: true
+            documentSymbolProvider: true,
+            // シンボルにホバーした時に説明を表示する
+            hoverProvider: true
         }
     }
 });
@@ -77,6 +79,9 @@ connection.onRenameRequest(({ textDocument, position, newName }) => {
 
 // list document symbols
 connection.onDocumentSymbol(({ textDocument }) => documentSymbol(textDocument.uri));
+
+// show hovers
+connection.onHover(({ textDocument, position }) => hover(textDocument.uri, position));
 
 connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
     const help: SignatureHelp = {

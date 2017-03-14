@@ -12,7 +12,7 @@ import {
     Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
     Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind,
     WorkspaceEdit, TextDocument, TextEdit, TextDocumentEdit, ResponseError,
-    ErrorCodes, SymbolInformation, SymbolKind
+    ErrorCodes, SymbolInformation, SymbolKind, Hover
 } from "vscode-languageserver";
 import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
@@ -371,6 +371,23 @@ export function documentSymbol(uri: string): Array<SymbolInformation> {
 
     function convertTokenToSymbolInformation(token: TokenInfo, kind: SymbolKind, containerName?: string) {
         return SymbolInformation.create(token.value, kind, createRangeFromTokenInfo(token), uri, containerName);
+    }
+}
+
+export function hover(uri: string, position: Position): Hover {
+    const noContents: Hover = { contents: [] };
+    const instructionToken = getTokenOfTypeAtPosition(TokenType.TINSTRUCTION, position);
+    if (instructionToken === undefined) return noContents;
+
+    const instructionNode = lastDiagnosticsResult.instructions.find(x => x.lineNumber == position.line);
+
+    if (instructionNode === undefined || instructionNode.originalTokens.instruction == instructionToken) {
+        const instruction = instructionCompletionItems.find(x => x.label === instructionToken.value);
+        if (instruction === undefined) return noContents;
+
+        return { contents: [instruction.detail!, instruction.documentation!] };
+    } else {
+        return noContents;
     }
 }
 
