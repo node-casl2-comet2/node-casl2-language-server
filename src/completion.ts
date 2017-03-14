@@ -41,7 +41,7 @@ export function createLabelCompletionItems(labels: Array<string>): Array<Complet
     function convertLabelToCompletionItem(label: string): CompletionItem {
         return {
             label: label,
-            kind: CompletionItemKind.Reference
+            kind: CompletionItemKind.Field
         };
     }
 }

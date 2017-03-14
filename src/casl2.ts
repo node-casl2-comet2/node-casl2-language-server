@@ -12,7 +12,7 @@ import {
     Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
     Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind,
     WorkspaceEdit, TextDocument, TextEdit, TextDocumentEdit, ResponseError,
-    ErrorCodes
+    ErrorCodes, SymbolInformation, SymbolKind
 } from "vscode-languageserver";
 import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
@@ -347,6 +347,33 @@ export function rename(uri: string, version: number, position: Position, newName
     };
 }
 
+// TODO: クライアント側の設定と同期させる
+const enableLabelScope = true;
+
+export function documentSymbol(uri: string): Array<SymbolInformation> {
+    const { subroutineLabels, labels } = lastDiagnosticsResult.labelMap.getAllLabels();
+
+    const a = subroutineLabels.map(x => convertTokenToSymbolInformation(x, SymbolKind.Function));
+    const b = labels.map(x => {
+        const containerName = enableLabelScope ? getSubroutineNameFromLine(x.line) : undefined;
+        return convertTokenToSymbolInformation(x, SymbolKind.Field, containerName);
+    });
+    const information = a.concat(b);
+
+    return information;
+
+    // 行番号から親のサブルーチン名を取得する
+    function getSubroutineNameFromLine(line: number): string | undefined {
+        const scope = getScopeFromLine(line);
+        const a = subroutineLabels.find(x => getScopeFromLine(x.line) == scope);
+        return a && a.value;
+    }
+
+    function convertTokenToSymbolInformation(token: TokenInfo, kind: SymbolKind, containerName?: string) {
+        return SymbolInformation.create(token.value, kind, createRangeFromTokenInfo(token), uri, containerName);
+    }
+}
+
 function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
     const tokens = getTokensAtPosition(position);
     if (tokens === undefined) return undefined;
@@ -386,10 +413,14 @@ function createLocationFromToken(uri: string, token: TokenInfo): Location {
     };
 }
 
-function getScopeFromPosition(position: Position) {
-    const scope = lastDiagnosticsResult.scopeMap.get(position.line);
+function getScopeFromLine(line: number) {
+    const scope = lastDiagnosticsResult.scopeMap.get(line);
     if (scope === undefined) throw new Error();
     return scope;
+}
+
+function getScopeFromPosition(position: Position) {
+    return getScopeFromLine(position.line);
 }
 
 function getAllReferenceableLabels(position: Position): Array<TokenInfo> {

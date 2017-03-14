@@ -11,7 +11,7 @@ import {
 } from "vscode-languageserver";
 import {
     validateSource, completion, gotoDefinition, findAllReferences,
-    documentHighlight, rename
+    documentHighlight, rename, documentSymbol
 } from "./casl2";
 
 // サーバー用のコネクションを作成する
@@ -45,7 +45,9 @@ connection.onInitialize((params): InitializeResult => {
             // 同じオブジェクトをハイライトする
             documentHighlightProvider: true,
             // 同一シンボルを一度にリネームする
-            renameProvider: true
+            renameProvider: true,
+            // 関数などの定義にジャンプできるようにする
+            documentSymbolProvider: true
         }
     }
 });
@@ -72,6 +74,9 @@ connection.onRenameRequest(({ textDocument, position, newName }) => {
     const version = document.version;
     return rename(textDocument.uri, version, position, newName);
 });
+
+// list document symbols
+connection.onDocumentSymbol(({ textDocument }) => documentSymbol(textDocument.uri));
 
 connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
     const help: SignatureHelp = {
