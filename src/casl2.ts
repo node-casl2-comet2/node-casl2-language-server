@@ -10,9 +10,9 @@ import {
 } from "./completion";
 import {
     Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
-    Location, Range, ReferenceContext
+    Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind
 } from "vscode-languageserver";
-import { instructionMap, isAddressToken } from "@maxfield/node-casl2-core";
+import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
 
 const casl2 = new Casl2();
@@ -290,16 +290,43 @@ export function gotoDefinition(uri: string, position: Position): Location | Arra
     return location;
 }
 
-export function findAllReferences(uri: string, position: Position, context: ReferenceContext): Array<Location> {
-    const noReferences: Array<Location> = [];
+function getAllReferences(position: Position): AllReferences | undefined {
     const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
-    if (labelToken === undefined) return noReferences;
+    if (labelToken === undefined) return undefined;
 
     const scope = getScopeFromPosition(position);
-    const references = lastDiagnosticsResult.labelMap.findAllReferences(context.includeDeclaration, labelToken.value, scope);
-    if (references === undefined) return noReferences;
+    const allReferences = lastDiagnosticsResult.labelMap.findAllReferences(labelToken.value, scope);
 
-    return references.map(x => createLocationFromToken(uri, x));
+    return allReferences;
+}
+
+export function findAllReferences(uri: string, position: Position, context: ReferenceContext): Array<Location> {
+    const noReferences: Array<Location> = [];
+    const allReferences = getAllReferences(position);
+    if (allReferences === undefined) return noReferences;
+
+    const { declaration, references } = allReferences;
+
+    const base = context.includeDeclaration && declaration ? [declaration] : [];
+    return base.concat(references).map(x => createLocationFromToken(uri, x));
+}
+
+export function documentHighlight(uri: string, position: Position): Array<DocumentHighlight> {
+    const noHighlights: Array<DocumentHighlight> = [];
+    const allReferences = getAllReferences(position);
+    if (allReferences === undefined) return noHighlights;
+
+    const base = allReferences.declaration ? [createDocumentHighlightFromToken(allReferences.declaration, DocumentHighlightKind.Write)] : [];
+    const rest = allReferences.references.map(x => createDocumentHighlightFromToken(x, DocumentHighlightKind.Read));
+
+    return base.concat(rest);
+
+    function createDocumentHighlightFromToken(token: TokenInfo, kind: DocumentHighlightKind): DocumentHighlight {
+        return {
+            range: createRangeFromTokenInfo(token),
+            kind: kind
+        };
+    }
 }
 
 function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
