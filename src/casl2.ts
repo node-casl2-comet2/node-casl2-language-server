@@ -10,7 +10,9 @@ import {
 } from "./completion";
 import {
     Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
-    Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind
+    Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind,
+    WorkspaceEdit, TextDocument, TextEdit, TextDocumentEdit, ResponseError,
+    ErrorCodes
 } from "vscode-languageserver";
 import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
@@ -329,6 +331,22 @@ export function documentHighlight(uri: string, position: Position): Array<Docume
     }
 }
 
+export function rename(uri: string, version: number, position: Position, newName: string): WorkspaceEdit {
+    // ハイライトされているところは同一シンボルということなので
+    // ハイライトされている部分をリネームすればよい
+    const highlights = documentHighlight(uri, position);
+    const edits = highlights.map(x => TextEdit.replace(x.range, newName));
+
+    return {
+        changes: [
+            {
+                textDocument: { uri: uri, version: version },
+                edits: edits
+            }
+        ]
+    };
+}
+
 function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
     const tokens = getTokensAtPosition(position);
     if (tokens === undefined) return undefined;
@@ -369,7 +387,9 @@ function createLocationFromToken(uri: string, token: TokenInfo): Location {
 }
 
 function getScopeFromPosition(position: Position) {
-    return lastDiagnosticsResult.scopeMap.get(position.line);
+    const scope = lastDiagnosticsResult.scopeMap.get(position.line);
+    if (scope === undefined) throw new Error();
+    return scope;
 }
 
 function getAllReferenceableLabels(position: Position): Array<TokenInfo> {
