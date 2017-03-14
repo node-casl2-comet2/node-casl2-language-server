@@ -10,7 +10,7 @@ import {
 } from "./completion";
 import {
     Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
-    Location, Range
+    Location, Range, ReferenceContext
 } from "vscode-languageserver";
 import { instructionMap, isAddressToken } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
@@ -277,7 +277,7 @@ export function gotoDefinition(uri: string, position: Position): Location | Arra
     const noDefinitions: Array<Location> = [];
     if (lastDiagnosticsResult === undefined) return noDefinitions;
     // カーソル位置にあるトークンを取得する
-    const labelToken = getTokenOfTypeAtPosition(lastDiagnosticsResult.tokensMap, TokenType.TLABEL, position);
+    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
     if (labelToken === undefined) return noDefinitions;
 
     const labels = getAllReferenceableLabels(position);
@@ -285,16 +285,25 @@ export function gotoDefinition(uri: string, position: Position): Location | Arra
 
     if (token === undefined) return noDefinitions;
 
-    const location: Location = {
-        uri: uri,
-        range: createRangeFromTokenInfo(token)
-    };
+    const location = createLocationFromToken(uri, token);
 
     return location;
 }
 
-function getTokenOfTypeAtPosition(tokensMap: Map<number, Array<TokenInfo>>, type: TokenType, position: Position): TokenInfo | undefined {
-    const tokens = getTokensAtPosition(tokensMap, position);
+export function findAllReferences(uri: string, position: Position, context: ReferenceContext): Array<Location> {
+    const noReferences: Array<Location> = [];
+    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
+    if (labelToken === undefined) return noReferences;
+
+    const scope = getScopeFromPosition(position);
+    const references = lastDiagnosticsResult.labelMap.findAllReferences(context.includeDeclaration, labelToken.value, scope);
+    if (references === undefined) return noReferences;
+
+    return references.map(x => createLocationFromToken(uri, x));
+}
+
+function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
+    const tokens = getTokensAtPosition(position);
     if (tokens === undefined) return undefined;
 
     const filtered = tokens.filter(x => x.type == type);
@@ -303,8 +312,8 @@ function getTokenOfTypeAtPosition(tokensMap: Map<number, Array<TokenInfo>>, type
     return filtered[filtered.length - 1];
 }
 
-function getTokensAtPosition(tokensMap: Map<number, Array<TokenInfo>>, position: Position): Array<TokenInfo> | undefined {
-    const lineTokens = tokensMap.get(position.line);
+function getTokensAtPosition(position: Position): Array<TokenInfo> | undefined {
+    const lineTokens = lastDiagnosticsResult.tokensMap.get(position.line);
     if (lineTokens === undefined) return undefined;
 
     const tokens = lineTokens.filter(x => x.startIndex <= position.character && position.character <= x.endIndex);
@@ -322,6 +331,13 @@ function createRangeFromTokenInfo(token: TokenInfo): Range {
             line: line,
             character: endIndex
         }
+    };
+}
+
+function createLocationFromToken(uri: string, token: TokenInfo): Location {
+    return {
+        uri: uri,
+        range: createRangeFromTokenInfo(token)
     };
 }
 

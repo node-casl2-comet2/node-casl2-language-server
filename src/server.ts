@@ -9,7 +9,7 @@ import {
     CompletionItem, CompletionItemKind, Position,
     SignatureHelp, Location
 } from "vscode-languageserver";
-import { validateSource, completion, gotoDefinition } from "./casl2";
+import { validateSource, completion, gotoDefinition, findAllReferences } from "./casl2";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -36,7 +36,9 @@ connection.onInitialize((params): InitializeResult => {
                 triggerCharacters: [",", " "]
             },
             // goto definitionが使えるか
-            definitionProvider: true
+            definitionProvider: true,
+            // find all referencesが使えるか
+            referencesProvider: true
         }
     }
 });
@@ -50,6 +52,9 @@ connection.onCompletion(textDocumentPosition => completion(textDocumentPosition.
 
 // 定義へ移動を提供する
 connection.onDefinition(({ textDocument, position }) => gotoDefinition(textDocument.uri, position));
+
+// find all references
+connection.onReferences(({ textDocument, position, context }) => findAllReferences(textDocument.uri, position, context));
 
 connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
     const help: SignatureHelp = {
