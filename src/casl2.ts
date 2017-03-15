@@ -120,28 +120,7 @@ function analyzeState(position: Position): void {
     if (!tokensInfo.success) return;
 
     const tokens = tokensInfo.tokens;
-    function completeInstructionLine() {
-        argIndex = -1;
-    }
-
-    // GRの補完を出す条件
-    // 前提: 命令が入力されていて，その命令がとるオペランドがGRである
-    const instructionToken = tokens.filter(x => x.type == TokenType.TINSTRUCTION);
-    if (instructionToken.length == 0) {
-        completeInstructionLine();
-        return;
-    }
-
-    const instToken = instructionToken[0];
-    const inst = instToken.value;
-    const info = instructionMap.get(inst);
-    if (info === undefined) throw new Error();
     const beforeCursorTokens = getTokensBeforePosition(tokens, position);
-
-    function labelCompletionItems(): Array<CompletionItem> {
-        const labels = getAllReferenceableLabels(position).map(x => x.value);
-        return createLabelCompletionItems(labels);
-    }
 
     function consume(...tokenTypes: Array<TokenType>): boolean {
         const count = tokenTypes.length;
@@ -165,6 +144,47 @@ function analyzeState(position: Position): void {
                     : v.reduce((a, b) => a && b);
 
         return valid;
+    }
+
+    // 命令の補完を出す条件
+    // 1. カーソルが先頭の空白の右側である
+    // 2. カーソルがラベルの右側である
+
+    function space(tokens: Array<TokenInfo>, position: Position): boolean {
+        if (beforeCursorTokens.length == 1) {
+            return consume(TokenType.TSPACE);
+        } else {
+            return false;
+        }
+    }
+
+    if (space(tokens, position) || consume(TokenType.TLABEL, TokenType.TSPACE)) {
+        // 命令
+        completionItems = Completion.Instruction;
+    } else {
+        completionItems = Completion.None;
+    }
+
+    function completeInstructionLine() {
+        argIndex = -1;
+    }
+
+    // GRの補完を出す条件
+    // 前提: 命令が入力されていて，その命令がとるオペランドがGRである
+    const instructionToken = tokens.filter(x => x.type == TokenType.TINSTRUCTION);
+    if (instructionToken.length == 0) {
+        completeInstructionLine();
+        return;
+    }
+
+    const instToken = instructionToken[0];
+    const inst = instToken.value;
+    const info = instructionMap.get(inst);
+    if (info === undefined) throw new Error();
+
+    function labelCompletionItems(): Array<CompletionItem> {
+        const labels = getAllReferenceableLabels(position).map(x => x.value);
+        return createLabelCompletionItems(labels);
     }
 
     function instSpace(): boolean {
@@ -339,22 +359,6 @@ function analyzeState(position: Position): void {
 }
 
 export function completion(position: Position): Array<CompletionItem> {
-    if (!lastDiagnosticsResult) return [];
-
-    // カーソルのある行のトークン列を取得する
-    const tokensInfo = lastDiagnosticsResult.tokensMap.get(position.line);
-    if (tokensInfo === undefined) throw new Error();
-    const tokens = tokensInfo.tokens;
-
-    // 命令の補完を出す条件
-    // 1. カーソルが先頭の空白の右側である
-    // 2. カーソルがラベルの右側である
-    // 3. カーソルが行の先頭である
-    if (space(tokens, position) || label_space(tokens, position) || startOfLine(tokens)) {
-        // 命令
-        return instructionCompletionItems;
-    }
-
     analyzeState(position);
 
     function labelCompletionItems(): Array<CompletionItem> {
@@ -380,37 +384,11 @@ export function completion(position: Position): Array<CompletionItem> {
     return [];
 }
 
-function space(tokens: Array<TokenInfo>, position: Position): boolean {
-    const filtered = getTokensBeforePosition(tokens, position);
-    if (filtered.length == 1) {
-        const [first] = filtered;
-        return first.type == TokenType.TSPACE;
-    }
-
-    return false;
-}
-
-function startOfLine(tokens: Array<TokenInfo>) {
-    if (tokens.length == 0) return true;
-    if (tokens.length == 1) {
-        return tokens[0].type == TokenType.TLABEL;
-    } else {
-        return false;
-    }
-}
-
-function label_space(tokens: Array<TokenInfo>, position: Position): boolean {
-    const t = getTokensBeforePosition(tokens, position);
-    if (t.length >= 2) {
-        const [l1, l2] = t.slice(t.length - 2);
-        return l1.type == TokenType.TLABEL && l2.type == TokenType.TSPACE;
-    }
-
-    return false;
-}
-
-function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position) {
+function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): Array<TokenInfo> {
     const filtered = tokens.filter(x => x.endIndex <= position.character);
+    if (filtered.length == 0) {
+        return [];
+    }
     const last = filtered[filtered.length - 1];
     const accept = last.type == TokenType.TCOMMASPACE || last.type == TokenType.TSPACE || last.type == TokenType.TGR;
 
