@@ -6,21 +6,35 @@ import {
 } from "@maxfield/node-casl2-core";
 import {
     instructionCompletionItems, grCompletionItems, indexGRCompletionItems,
-    createLabelCompletionItems
+    createLabelCompletionItems, Completion
 } from "./completion";
-import {
-    Diagnostic, DiagnosticSeverity, CompletionItem, CompletionItemKind, Position,
-    Location, Range, ReferenceContext, DocumentHighlight, DocumentHighlightKind,
-    WorkspaceEdit, TextDocument, TextEdit, TextDocumentEdit, ResponseError,
-    ErrorCodes, SymbolInformation, SymbolKind, Hover, SignatureHelp, SignatureInformation,
-    ParameterInformation
-} from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity, Position, CompletionItem, Range, Location } from "vscode-languageserver";
 import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
 
+import { hover as Hover } from "./hover";
+import { documentHighlight as DocumentHighlight } from "./documentHighlight";
+import { rename as Rename } from "./rename";
+import { completion as doCompletion } from "./completion";
+import { documentSymbol as DocumentSymbol } from "./documentSymbol";
+import { signatureHelp as SignatureHelp } from "./signatureHelp";
+import { gotoDefinition as GotoDefinition } from "./gotoDefinition";
+import { findAllReferences as FindAllReferences } from "./findAllReferences";
+
+export namespace LanguageServices {
+    export const hover = Hover;
+    export const documentHighlight = DocumentHighlight;
+    export const rename = Rename;
+    export const completion = doCompletion;
+    export const documentSymbol = DocumentSymbol;
+    export const signatureHelp = SignatureHelp;
+    export const gotoDefinition = GotoDefinition;
+    export const findAllReferences = FindAllReferences;
+}
+
 const casl2 = new Casl2();
 
-let lastDiagnosticsResult: Casl2DiagnosticResult;
+export let lastDiagnosticsResult: Casl2DiagnosticResult;
 
 export function validateSource(lines: Array<string>): Array<Diagnostic> {
     documentUpdated = true;
@@ -67,15 +81,6 @@ function convertDiagnosticCategory(category: DiagnosticCategory): DiagnosticSeve
     throw new Error();
 }
 
-enum Completion {
-    Instruction,
-    GR,
-    IndexGR,
-    Labels,
-    GRANDLabels,
-    None
-}
-
 // 入力中の命令の引数の種類
 let argumentType: ArgumentType;
 // 何番目の引数を入力中か
@@ -86,6 +91,12 @@ let instruction: string;
 let overload = 0;
 // どの補完を出すか
 let completionItems = Completion.None;
+
+export function getCurrentState() {
+    return {
+        argumentType, argIndex, instruction, overload, completionItems
+    };
+}
 
 let documentUpdated = true;
 let positionChanged = true;
@@ -103,7 +114,7 @@ function shouldAnalyzeState() {
     return documentUpdated || positionChanged;
 }
 
-function analyzeState(position: Position): void {
+export function analyzeState(position: Position): void {
     setCurrentPosition(position);
 
     if (!shouldAnalyzeState()) return;
@@ -358,32 +369,6 @@ function analyzeState(position: Position): void {
     }
 }
 
-export function completion(position: Position): Array<CompletionItem> {
-    analyzeState(position);
-
-    function labelCompletionItems(): Array<CompletionItem> {
-        const labels = getAllReferenceableLabels(position).map(x => x.value);
-        return createLabelCompletionItems(labels);
-    }
-
-    switch (completionItems) {
-        case Completion.Instruction:
-            return instructionCompletionItems;
-        case Completion.GR:
-            return grCompletionItems;
-        case Completion.IndexGR:
-            return indexGRCompletionItems;
-        case Completion.Labels:
-            return labelCompletionItems();
-        case Completion.GRANDLabels:
-            return grCompletionItems.concat(labelCompletionItems());
-        case Completion.None:
-            break;
-    }
-
-    return [];
-}
-
 function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): Array<TokenInfo> {
     const filtered = tokens.filter(x => x.endIndex <= position.character);
     if (filtered.length == 0) {
@@ -409,24 +394,7 @@ function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): 
     }
 }
 
-export function gotoDefinition(uri: string, position: Position): Location | Array<Location> {
-    const noDefinitions: Array<Location> = [];
-    if (lastDiagnosticsResult === undefined) return noDefinitions;
-    // カーソル位置にあるトークンを取得する
-    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
-    if (labelToken === undefined) return noDefinitions;
-
-    const labels = getAllReferenceableLabels(position);
-    const token = labels.find(x => x.value == labelToken.value);
-
-    if (token === undefined) return noDefinitions;
-
-    const location = createLocationFromToken(uri, token);
-
-    return location;
-}
-
-function getAllReferences(position: Position): AllReferences | undefined {
+export function getAllReferences(position: Position): AllReferences | undefined {
     const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
     if (labelToken === undefined) return undefined;
 
@@ -436,201 +404,7 @@ function getAllReferences(position: Position): AllReferences | undefined {
     return allReferences;
 }
 
-export function findAllReferences(uri: string, position: Position, context: ReferenceContext): Array<Location> {
-    const noReferences: Array<Location> = [];
-    const allReferences = getAllReferences(position);
-    if (allReferences === undefined) return noReferences;
-
-    const { declaration, references } = allReferences;
-
-    const base = context.includeDeclaration && declaration ? [declaration] : [];
-    return base.concat(references).map(x => createLocationFromToken(uri, x));
-}
-
-export function documentHighlight(uri: string, position: Position): Array<DocumentHighlight> {
-    const noHighlights: Array<DocumentHighlight> = [];
-    const allReferences = getAllReferences(position);
-    if (allReferences === undefined) return noHighlights;
-
-    const base = allReferences.declaration ? [createDocumentHighlightFromToken(allReferences.declaration, DocumentHighlightKind.Write)] : [];
-    const rest = allReferences.references.map(x => createDocumentHighlightFromToken(x, DocumentHighlightKind.Read));
-
-    return base.concat(rest);
-
-    function createDocumentHighlightFromToken(token: TokenInfo, kind: DocumentHighlightKind): DocumentHighlight {
-        return {
-            range: createRangeFromTokenInfo(token),
-            kind: kind
-        };
-    }
-}
-
-export function rename(uri: string, version: number, position: Position, newName: string): WorkspaceEdit {
-    // ハイライトされているところは同一シンボルということなので
-    // ハイライトされている部分をリネームすればよい
-    const highlights = documentHighlight(uri, position);
-    const edits = highlights.map(x => TextEdit.replace(x.range, newName));
-
-    return {
-        changes: [
-            {
-                textDocument: { uri: uri, version: version },
-                edits: edits
-            }
-        ]
-    };
-}
-
-// TODO: クライアント側の設定と同期させる
-const enableLabelScope = true;
-
-export function documentSymbol(uri: string): Array<SymbolInformation> {
-    const { subroutineLabels, labels } = lastDiagnosticsResult.labelMap.getAllLabels();
-
-    const a = subroutineLabels.map(x => convertTokenToSymbolInformation(x, SymbolKind.Function));
-    const b = labels.map(x => {
-        const containerName = enableLabelScope ? getSubroutineNameFromLine(x.line) : undefined;
-        return convertTokenToSymbolInformation(x, SymbolKind.Field, containerName);
-    });
-    const information = a.concat(b);
-
-    return information;
-
-    // 行番号から親のサブルーチン名を取得する
-    function getSubroutineNameFromLine(line: number): string | undefined {
-        const scope = getScopeFromLine(line);
-        const a = subroutineLabels.find(x => getScopeFromLine(x.line) == scope);
-        return a && a.value;
-    }
-
-    function convertTokenToSymbolInformation(token: TokenInfo, kind: SymbolKind, containerName?: string) {
-        return SymbolInformation.create(token.value, kind, createRangeFromTokenInfo(token), uri, containerName);
-    }
-}
-
-export function hover(uri: string, position: Position): Hover {
-    const noContents: Hover = { contents: [] };
-    const instructionToken = getTokenOfTypeAtPosition(TokenType.TINSTRUCTION, position);
-    if (instructionToken === undefined) return noContents;
-
-    const instructionNode = lastDiagnosticsResult.instructions.find(x => x.lineNumber == position.line);
-
-    if (instructionNode === undefined || instructionNode.originalTokens.instruction == instructionToken) {
-        const instruction = instructionCompletionItems.find(x => x.label === instructionToken.value);
-        if (instruction === undefined) return noContents;
-
-        return { contents: [instruction.detail!, instruction.documentation!] };
-    } else {
-        return noContents;
-    }
-}
-
-const noSignatureHelp = { signatures: [], activeParameter: 0, activeSignature: 0 };
-export function signatureHelp(uri: string, position: Position): SignatureHelp {
-    analyzeState(position);
-    if (argIndex < 0) return noSignatureHelp;
-
-    return {
-        signatures: argumentTypeToString(),
-        activeParameter: argIndex || 0,
-        activeSignature: overload || 0
-    };
-}
-
-function argumentTypeToString(): Array<SignatureInformation> {
-    enum Argument {
-        label,
-        decimal,
-        constant,
-        adr,
-        r,
-        r1,
-        r2,
-        x,
-        buf,
-        len
-    }
-
-    const map = new Map<Argument, string>([
-        [Argument.label, "label"],
-        [Argument.decimal, "decimal"],
-        [Argument.constant, "constant"],
-        [Argument.adr, "adr"],
-        [Argument.r, "r"],
-        [Argument.r1, "r1"],
-        [Argument.r2, "r2"],
-        [Argument.x, "x"],
-        [Argument.buf, "buf"],
-        [Argument.len, "len"]
-    ]);
-
-    switch (argumentType) {
-        case ArgumentType.none:
-            return [];
-        case ArgumentType.label_START:
-            return [
-                createSignatureInformation(),
-                createSignatureInformation(Argument.label)
-            ];
-        case ArgumentType.decimal_DS:
-            return [
-                createSignatureInformation(Argument.decimal)
-            ];
-        case ArgumentType.constants_DC:
-            return [
-                {
-                    label: instruction + " constant[, constant ...]",
-                    parameters: [{ label: "constant" }, { label: ", constant ..." }]
-                }
-            ];
-        case ArgumentType.adr_r2:
-            return [
-                createSignatureInformation(Argument.adr),
-                createSignatureInformation(Argument.adr, Argument.x)
-            ];
-        case ArgumentType.r:
-            return [
-                createSignatureInformation(Argument.r)
-            ];
-        case ArgumentType.adr_adr:
-            return [
-                createSignatureInformation(Argument.buf, Argument.len)
-            ];
-        case ArgumentType.r1_r2:
-            return [
-                createSignatureInformation(Argument.r1, Argument.r2)
-            ];
-        case ArgumentType.r1_adr_r2:
-            return [
-                createSignatureInformation(Argument.r, Argument.adr),
-                createSignatureInformation(Argument.r, Argument.adr, Argument.x)
-            ];
-        case ArgumentType.r1_r2_OR_r1_adr_r2:
-            return [
-                createSignatureInformation(Argument.r1, Argument.r2),
-                createSignatureInformation(Argument.r1, Argument.adr),
-                createSignatureInformation(Argument.r1, Argument.adr, Argument.x),
-            ];
-        default:
-            return [];
-    }
-
-    function argumentToString(arg: Argument) {
-        const r = map.get(arg);
-        if (r === undefined) throw new Error();
-        return r;
-    }
-
-    function createSignatureInformation(...args: Array<Argument>): SignatureInformation {
-        const names = args.map(argumentToString);
-        return {
-            label: `${instruction} ${names.join(", ")}`,
-            parameters: names.map(x => ParameterInformation.create(x))
-        };
-    }
-}
-
-function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
+export function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
     const tokens = getTokensAtPosition(position);
     if (tokens === undefined) return undefined;
 
@@ -640,7 +414,7 @@ function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInf
     return filtered[filtered.length - 1];
 }
 
-function getTokensAtPosition(position: Position): Array<TokenInfo> | undefined {
+export function getTokensAtPosition(position: Position): Array<TokenInfo> | undefined {
     const lineTokens = lastDiagnosticsResult.tokensMap.get(position.line);
     if (lineTokens === undefined) return undefined;
 
@@ -648,7 +422,7 @@ function getTokensAtPosition(position: Position): Array<TokenInfo> | undefined {
     return tokens;
 }
 
-function createRangeFromTokenInfo(token: TokenInfo): Range {
+export function createRangeFromTokenInfo(token: TokenInfo): Range {
     const { line, startIndex, endIndex } = token;
     return {
         start: {
@@ -662,14 +436,14 @@ function createRangeFromTokenInfo(token: TokenInfo): Range {
     };
 }
 
-function createLocationFromToken(uri: string, token: TokenInfo): Location {
+export function createLocationFromToken(uri: string, token: TokenInfo): Location {
     return {
         uri: uri,
         range: createRangeFromTokenInfo(token)
     };
 }
 
-function getScopeFromLine(line: number) {
+export function getScopeFromLine(line: number) {
     const scope = lastDiagnosticsResult.scopeMap.get(line);
     if (scope === undefined) throw new Error();
     return scope;
@@ -679,7 +453,7 @@ function getScopeFromPosition(position: Position) {
     return getScopeFromLine(position.line);
 }
 
-function getAllReferenceableLabels(position: Position): Array<TokenInfo> {
+export function getAllReferenceableLabels(position: Position): Array<TokenInfo> {
     const scope = getScopeFromPosition(position);
     if (scope !== undefined) {
         return lastDiagnosticsResult.labelMap.getAllReferenceableLabels(scope);

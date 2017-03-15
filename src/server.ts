@@ -9,10 +9,7 @@ import {
     CompletionItem, CompletionItemKind, Position,
     SignatureHelp, Location
 } from "vscode-languageserver";
-import {
-    validateSource, completion, gotoDefinition, findAllReferences,
-    documentHighlight, rename, documentSymbol, hover, signatureHelp
-} from "./casl2";
+import { validateSource, LanguageServices } from "./services/core";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -63,32 +60,32 @@ connection.onInitialize((params): InitializeResult => {
 documents.onDidChangeContent(change => validateTextDocument(change.document));
 
 // 補完を提供する
-connection.onCompletion(textDocumentPosition => completion(textDocumentPosition.position));
+connection.onCompletion(textDocumentPosition => LanguageServices.completion(textDocumentPosition.position));
 
 // 定義へ移動を提供する
-connection.onDefinition(({ textDocument, position }) => gotoDefinition(textDocument.uri, position));
+connection.onDefinition(({ textDocument, position }) => LanguageServices.gotoDefinition(textDocument.uri, position));
 
 // find all references
-connection.onReferences(({ textDocument, position, context }) => findAllReferences(textDocument.uri, position, context));
+connection.onReferences(({ textDocument, position, context }) => LanguageServices.findAllReferences(textDocument.uri, position, context));
 
 // document documenthighlight
-connection.onDocumentHighlight(({ textDocument, position }) => documentHighlight(textDocument.uri, position));
+connection.onDocumentHighlight(({ textDocument, position }) => LanguageServices.documentHighlight(textDocument.uri, position));
 
 // rename symbols
 connection.onRenameRequest(({ textDocument, position, newName }) => {
     const document = documents.get(textDocument.uri);
     const version = document.version;
-    return rename(textDocument.uri, version, position, newName);
+    return LanguageServices.rename(textDocument.uri, version, position, newName);
 });
 
 // list document symbols
-connection.onDocumentSymbol(({ textDocument }) => documentSymbol(textDocument.uri));
+connection.onDocumentSymbol(({ textDocument }) => LanguageServices.documentSymbol(textDocument.uri));
 
 // show hovers
-connection.onHover(({ textDocument, position }) => hover(textDocument.uri, position));
+connection.onHover(({ textDocument, position }) => LanguageServices.hover(textDocument.uri, position));
 
 // signature help
-connection.onSignatureHelp(({ textDocument, position }) => signatureHelp(textDocument.uri, position));
+connection.onSignatureHelp(({ textDocument, position }) => LanguageServices.signatureHelp(textDocument.uri, position));
 
 // サーバー関連の設定部分のインターフェース
 interface Settings {
