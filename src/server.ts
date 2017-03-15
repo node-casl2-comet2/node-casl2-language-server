@@ -9,7 +9,8 @@ import {
     CompletionItem, CompletionItemKind, Position,
     SignatureHelp, Location
 } from "vscode-languageserver";
-import { validateSource, LanguageServices } from "./services/core";
+import { validateSource, LanguageServices, updateOption } from "./services/core";
+import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -89,17 +90,26 @@ connection.onSignatureHelp(({ textDocument, position }) => LanguageServices.sign
 
 // サーバー関連の設定部分のインターフェース
 interface Settings {
-    languageServerExample: ServerSettings;
+    casl2: ServerSettings;
 }
 
 // クライアントのpackage.jsonで定義した設定例
 interface ServerSettings {
+    useGR8AsSp: boolean;
+    enableLabelScope: boolean;
 }
 
 
 // 設定変更時に発行される
 connection.onDidChangeConfiguration((change) => {
-    const settings = <Settings>change.settings;
+    const settings = (change.settings as Settings).casl2;
+
+    const newOption: Casl2CompileOption = {
+        useGR8: settings.useGR8AsSp,
+        enableLabelScope: settings.enableLabelScope
+    };
+
+    updateOption(newOption);
 
     // すべてのファイルを再検証する
     documents.all().forEach(validateTextDocument);

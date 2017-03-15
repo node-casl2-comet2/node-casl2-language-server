@@ -1,7 +1,7 @@
 "use strict";
 
 import {
-    Casl2, Diagnostic as Casl2Diagnostic, DiagnosticCategory, Casl2DiagnosticResult,
+    Casl2, Casl2CompileOption, Diagnostic as Casl2Diagnostic, DiagnosticCategory, Casl2DiagnosticResult,
     TokenType, TokenInfo
 } from "@maxfield/node-casl2-core";
 import {
@@ -30,6 +30,15 @@ export namespace LanguageServices {
     export const signatureHelp = SignatureHelp;
     export const gotoDefinition = GotoDefinition;
     export const findAllReferences = FindAllReferences;
+}
+
+let currentOption: Casl2CompileOption;
+export function getCurrentOption() {
+    return currentOption;
+}
+export function updateOption(option: Casl2CompileOption) {
+    currentOption = option;
+    casl2.changeCompileOption(option);
 }
 
 const casl2 = new Casl2();

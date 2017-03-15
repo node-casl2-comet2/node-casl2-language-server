@@ -1,11 +1,8 @@
 "use strict";
 
 import { SymbolInformation, SymbolKind, Range, Position } from "vscode-languageserver";
-import { lastDiagnosticsResult, getScopeFromLine, createRangeFromTokenInfo } from "./core";
+import { lastDiagnosticsResult, getScopeFromLine, createRangeFromTokenInfo, getCurrentOption } from "./core";
 import { TokenInfo } from "@maxfield/node-casl2-core";
-
-// TODO: クライアント側の設定と同期させる
-const enableLabelScope = true;
 
 export function documentSymbol(uri: string): Array<SymbolInformation> {
     const { subroutineLabels, labels } = lastDiagnosticsResult.labelMap.getAllLabels();
@@ -15,7 +12,7 @@ export function documentSymbol(uri: string): Array<SymbolInformation> {
         .map(x => convertTokenToSymbolInformation(x, SymbolKind.Function, subroutineLabelTokenToRange(x)));
     // ラベルのシンボル情報を作る
     const labelSymbols = labels.map(x => {
-        const containerName = enableLabelScope ? getSubroutineNameFromLine(x.line) : undefined;
+        const containerName = getCurrentOption().enableLabelScope ? getSubroutineNameFromLine(x.line) : undefined;
         return convertTokenToSymbolInformation(x, SymbolKind.Field, createRangeFromTokenInfo(x), containerName);
     });
     const information = subroutineSymbols.concat(labelSymbols);
