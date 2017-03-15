@@ -11,7 +11,7 @@ import {
 } from "vscode-languageserver";
 import {
     validateSource, completion, gotoDefinition, findAllReferences,
-    documentHighlight, rename, documentSymbol, hover
+    documentHighlight, rename, documentSymbol, hover, signatureHelp
 } from "./casl2";
 
 // サーバー用のコネクションを作成する
@@ -49,7 +49,11 @@ connection.onInitialize((params): InitializeResult => {
             // 関数などの定義にジャンプできるようにする
             documentSymbolProvider: true,
             // シンボルにホバーした時に説明を表示する
-            hoverProvider: true
+            hoverProvider: true,
+            // 関数の引数の説明を表示する
+            signatureHelpProvider: {
+                triggerCharacters: [",", " "]
+            }
         }
     }
 });
@@ -83,46 +87,8 @@ connection.onDocumentSymbol(({ textDocument }) => documentSymbol(textDocument.ur
 // show hovers
 connection.onHover(({ textDocument, position }) => hover(textDocument.uri, position));
 
-connection.onSignatureHelp(({ textDocument, position }): SignatureHelp => {
-    const help: SignatureHelp = {
-        signatures: [
-            {
-                // ラベルにパラメーター名を含ませておくと
-                // vscodeがアクティブなパラメーターを太字にしてくれる
-                label: "hello(r1, r2)",
-                documentation: "hello doc",
-                parameters: [
-                    {
-                        label: "r1",
-                        documentation: "aaa"
-                    },
-                    {
-                        label: "r2",
-                        documentation: "bbb"
-                    }
-                ]
-            },
-            {
-                label: "hello2(r3, r4)",
-                documentation: "hello2 doc",
-                parameters: [
-                    {
-                        label: "r3",
-                        documentation: "ccc"
-                    },
-                    {
-                        label: "r4",
-                        documentation: "ddd"
-                    }
-                ]
-            }
-        ],
-        activeParameter: 0,
-        activeSignature: 0
-    };
-
-    return help;
-});
+// signature help
+connection.onSignatureHelp(({ textDocument, position }) => signatureHelp(textDocument.uri, position));
 
 // サーバー関連の設定部分のインターフェース
 interface Settings {
