@@ -23,6 +23,8 @@ const casl2 = new Casl2();
 let lastDiagnosticsResult: Casl2DiagnosticResult;
 
 export function validateSource(lines: Array<string>): Array<Diagnostic> {
+    documentUpdated = true;
+
     const diagnosticResult = casl2.analyze(lines);
     const { diagnostics } = diagnosticResult;
 
@@ -65,6 +67,15 @@ function convertDiagnosticCategory(category: DiagnosticCategory): DiagnosticSeve
     throw new Error();
 }
 
+enum Completion {
+    Instruction,
+    GR,
+    IndexGR,
+    Labels,
+    GRANDLabels,
+    None
+}
+
 // 入力中の命令の引数の種類
 let argumentType: ArgumentType;
 // 何番目の引数を入力中か
@@ -73,8 +84,34 @@ let argIndex: number;
 let instruction: string;
 // どの命令のオーバーロードが選択されているか
 let overload = 0;
+// どの補完を出すか
+let completionItems = Completion.None;
+
+let documentUpdated = true;
+let positionChanged = true;
+let currentPosition: Position = Position.create(-1, -1);
+function setCurrentPosition(position: Position) {
+    if (position.character != currentPosition.character || position.line != currentPosition.line) {
+        currentPosition = position;
+        positionChanged = true;
+    } else {
+        positionChanged = false;
+    }
+}
+
+function shouldAnalyzeState() {
+    return documentUpdated || positionChanged;
+}
 
 function analyzeState(position: Position): void {
+    setCurrentPosition(position);
+
+    if (!shouldAnalyzeState()) return;
+
+    console.log("Analyzing  State");
+
+    documentUpdated = false;
+
     if (!lastDiagnosticsResult) return;
 
     // カーソルのある行のトークン列を取得する
@@ -157,6 +194,7 @@ function analyzeState(position: Position): void {
             else if (instSpace()) {
                 argIndex = 1;
                 overload = 1;
+                completionItems = Completion.Labels;
             }
             // e.g. START BEGIN|
             else if (instSpaceTrailing(TokenType.TADDRESS)) {
@@ -174,6 +212,7 @@ function analyzeState(position: Position): void {
             if (instSpace()) {
                 argIndex = 0;
                 overload = 0;
+                completionItems = Completion.Labels;
             }
             // e.g. DC 1, |
             // DCは任意長のオペランドをもつので
@@ -185,6 +224,7 @@ function analyzeState(position: Position): void {
                     if (l1.type == TokenType.TCOMMASPACE) {
                         argIndex = 1;
                         overload = 0;
+                        completionItems = Completion.Labels;
                     }
                 }
             }
@@ -196,11 +236,13 @@ function analyzeState(position: Position): void {
             if (instSpace()) {
                 argIndex = 0;
                 overload = 0;
+                completionItems = Completion.Labels;
             }
             // e.g. JUMP L1, |
             else if (instSpaceTrailing(TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
                 argIndex = 1;
                 overload = 1;
+                completionItems = Completion.IndexGR;
             }
             // e.g. JUMP L1, GR1
             else if (instSpaceTrailing(TokenType.TADDRESS, TokenType.TCOMMASPACE, TokenType.TGR)) {
@@ -214,6 +256,7 @@ function analyzeState(position: Position): void {
             if (instSpace()) {
                 argIndex = 0;
                 overload = 0;
+                completionItems = Completion.GR;
             }
             // e.g. POP GR1
             else if (instSpaceTrailing(TokenType.TGR)) {
@@ -233,16 +276,19 @@ function analyzeState(position: Position): void {
             if (instSpace()) {
                 argIndex = 0;
                 overload = 0;
+                completionItems = Completion.GR;
             }
             // e.g. SLA GR1, |
             else if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE)) {
                 argIndex = 1;
                 overload = 0;
+                completionItems = Completion.Labels;
             }
             // e.g. SLA GR1, 1, |
             else if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE, TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
                 argIndex = 2;
                 overload = 1;
+                completionItems = Completion.IndexGR;
             }
             // e.g. SLA GR1, 1, GR2|
             else if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE, TokenType.TADDRESS, TokenType.TCOMMASPACE, TokenType.TGR)) {
@@ -256,12 +302,14 @@ function analyzeState(position: Position): void {
             if (instSpace()) {
                 argIndex = 0;
                 overload = 0;
+                completionItems = Completion.GR;
             }
             // e.g. ADDA GR1, |
             if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE)) {
-                // ラベルが来る可能性もあるので，ラベルも補完候補に含める
                 argIndex = 1;
                 overload = 0;
+                // ラベルが来る可能性もあるので，ラベルも補完候補に含める
+                completionItems = Completion.GRANDLabels;
             }
 
             // e.g. ADDA GR1, GR2| (入力終わり)
@@ -279,6 +327,7 @@ function analyzeState(position: Position): void {
             else if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE, TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
                 argIndex = 2;
                 overload = 2;
+                completionItems = Completion.IndexGR;
             }
 
             // e.g. ADDA GR1, 1, GR1| (入力終わり)
@@ -306,179 +355,26 @@ export function completion(position: Position): Array<CompletionItem> {
         return instructionCompletionItems;
     }
 
-    // GRの補完を出す条件
-    // 前提: 命令が入力されていて，その命令がとるオペランドがGRである
-    const instructionToken = tokens.filter(x => x.type == TokenType.TINSTRUCTION);
-    if (instructionToken.length > 0) {
-        const instToken = instructionToken[0];
-        const inst = instToken.value;
-        const info = instructionMap.get(inst);
-        if (info === undefined) throw new Error();
-        const beforeCursorTokens = getTokensBeforePosition(tokens, position);
+    analyzeState(position);
 
-        function labelCompletionItems(): Array<CompletionItem> {
-            const labels = getAllReferenceableLabels(position).map(x => x.value);
-            return createLabelCompletionItems(labels);
-        }
+    function labelCompletionItems(): Array<CompletionItem> {
+        const labels = getAllReferenceableLabels(position).map(x => x.value);
+        return createLabelCompletionItems(labels);
+    }
 
-        function instSpaceTrailing(...tokenTypes: Array<TokenType>): boolean {
-            const count = 2 + tokenTypes.length;
-            if (beforeCursorTokens.length >= count) {
-                const slice = beforeCursorTokens.slice(beforeCursorTokens.length - count);
-
-                function isValid(t: TokenType, index: number) {
-                    const type = slice[2 + index].type;
-                    if (t == TokenType.TADDRESS) {
-                        return isAddressToken(type);
-                    } else {
-                        return type == t;
-                    }
-                }
-
-                const v = tokenTypes.map((t, index) => isValid(t, index));
-                const valid =
-                    v.length == 0
-                        ? true
-                        : v.length == 1
-                            ? v[0]
-                            : v.reduce((a, b) => a && b);
-
-                if (slice[0] == instToken && slice[1].type == TokenType.TSPACE && valid) {
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        function instSpace(): boolean {
-            return instSpaceTrailing();
-        }
-
-        argumentType = info.argumentType;
-        instruction = info.instructionName;
-
-        switch (info.argumentType) {
-            case ArgumentType.none:
-                // 何も補完しない
-                overload = 0;
-                break;
-
-            case ArgumentType.label_START:
-                // e.g. START |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return labelCompletionItems();
-                }
-                break;
-
-            case ArgumentType.decimal_DS:
-                // 何も補完しない
-                overload = 0;
-                break;
-
-            case ArgumentType.constants_DC:
-                // e.g. DC |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return labelCompletionItems();
-                }
-                // e.g. DC 1, |
-                // DCは任意長のオペランドをもつので
-                // カーソルの左側に命令があって，かつカーソルの直前のトークンが
-                // TCOMMASPACEの時補完を出すことにしている
-                if (beforeCursorTokens.indexOf(instToken) != -1) {
-                    if (beforeCursorTokens.length >= 1) {
-                        const [l1] = beforeCursorTokens.slice(beforeCursorTokens.length - 1);
-                        if (l1.type == TokenType.TCOMMASPACE) {
-                            argIndex = 1;
-                            overload = 0;
-                            return labelCompletionItems();
-                        }
-                    }
-                }
-                break;
-
-
-            case ArgumentType.adr_r2:
-                // e.g. JUMP |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return labelCompletionItems();
-                }
-                // e.g. JUMP L1, |
-                if (instSpaceTrailing(TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
-                    argIndex = 1;
-                    overload = 1;
-                    return indexGRCompletionItems;
-                }
-                break;
-
-
-            case ArgumentType.r:
-                // e.g. POP |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return grCompletionItems;
-                }
-                break;
-
-
-            case ArgumentType.r1_r2:
-                // r1, r2パターンのみの命令は存在しないので
-                // r1_r2_OR_r1_adr_r2で処理されるはず
-                throw new Error();
-
-
-            case ArgumentType.r1_adr_r2:
-                // e.g. SLA |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return grCompletionItems;
-                }
-                // e.g. SLA GR1, |
-                if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE)) {
-                    argIndex = 1;
-                    overload = 0;
-                    return labelCompletionItems();
-                }
-                // e.g. SLA GR1, 1, |
-                if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE, TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
-                    argIndex = 2;
-                    overload = 1;
-                    return indexGRCompletionItems;
-                }
-                break;
-
-
-            case ArgumentType.r1_r2_OR_r1_adr_r2:
-                // e.g. ADDA |
-                if (instSpace()) {
-                    argIndex = 0;
-                    overload = 0;
-                    return grCompletionItems;
-                }
-                // e.g. ADDA GR1, |
-                if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE)) {
-                    // ラベルが来る可能性もあるので，ラベルも補完候補に含める
-                    argIndex = 1;
-                    overload = 0;
-                    const merge = grCompletionItems.concat(labelCompletionItems());
-                    return merge;
-                }
-                // e.g. ADDA GR1, 1, |
-                if (instSpaceTrailing(TokenType.TGR, TokenType.TCOMMASPACE, TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
-                    argIndex = 2;
-                    overload = 2;
-                    return indexGRCompletionItems;
-                }
-                break;
-        }
+    switch (completionItems) {
+        case Completion.Instruction:
+            return instructionCompletionItems;
+        case Completion.GR:
+            return grCompletionItems;
+        case Completion.IndexGR:
+            return indexGRCompletionItems;
+        case Completion.Labels:
+            return labelCompletionItems();
+        case Completion.GRANDLabels:
+            return grCompletionItems.concat(labelCompletionItems());
+        case Completion.None:
+            break;
     }
 
     return [];
@@ -650,21 +546,16 @@ export function hover(uri: string, position: Position): Hover {
     }
 }
 
+const noSignatureHelp = { signatures: [], activeParameter: 0, activeSignature: 0 };
 export function signatureHelp(uri: string, position: Position): SignatureHelp {
-    console.log("signature help");
-    const noSignatureHelp = { signatures: [], activeParameter: 0, activeSignature: 0 };
-
     analyzeState(position);
-
     if (argIndex < 0) return noSignatureHelp;
 
-    const help: SignatureHelp = {
+    return {
         signatures: argumentTypeToString(),
         activeParameter: argIndex || 0,
         activeSignature: overload || 0
     };
-
-    return help;
 }
 
 function argumentTypeToString(): Array<SignatureInformation> {
