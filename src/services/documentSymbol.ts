@@ -32,10 +32,9 @@ export function documentSymbol(uri: string): Array<SymbolInformation> {
 }
 
 function subroutineLabelTokenToRange(token: TokenInfo): Range {
-    const scopes = Array.from(lastDiagnosticsResult.scopeMap.values());
-    const scope = getScopeFromLine(token.line);
-    const start = scopes.indexOf(scope);
-    const end = scopes.lastIndexOf(scope);
+    const subroutinesInfo = lastDiagnosticsResult.subroutinesInfo;
+    const info = subroutinesInfo.find(x => x.subroutine === token.value);
+    if (info === undefined) throw new Error();
 
-    return Range.create(Position.create(start, 0), Position.create(end, 0));
+    return Range.create(Position.create(info.startLine, 0), Position.create(info.endLine, 0));
 }
