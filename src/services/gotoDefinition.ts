@@ -3,7 +3,7 @@
 import { Location, Position } from "vscode-languageserver";
 import {
     lastDiagnosticsResult, getAllReferenceableLabels, getTokenOfTypeAtPosition,
-    createLocationFromToken
+    createLocationFromToken, getLabelFromPosition
 } from "./core";
 import { TokenType } from "@maxfield/node-casl2-core";
 
@@ -11,7 +11,7 @@ export function gotoDefinition(uri: string, position: Position): Location | Arra
     const noDefinitions: Array<Location> = [];
     if (lastDiagnosticsResult === undefined) return noDefinitions;
     // カーソル位置にあるトークンを取得する
-    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
+    const labelToken = getLabelFromPosition(position);
     if (labelToken === undefined) return noDefinitions;
 
     const labels = getAllReferenceableLabels(position);

@@ -395,13 +395,25 @@ function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): 
 }
 
 export function getAllReferences(position: Position): AllReferences | undefined {
-    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position);
+    const labelToken = getLabelFromPosition(position);
     if (labelToken === undefined) return undefined;
 
     const scope = getScopeFromPosition(position);
     const allReferences = lastDiagnosticsResult.labelMap.findAllReferences(labelToken.value, scope);
 
     return allReferences;
+}
+
+export function getLabelFromPosition(position: Position): TokenInfo | undefined {
+    const labelToken = getTokenOfTypeAtPosition(TokenType.TLABEL, position)
+        || getTokenOfTypeAtPosition(TokenType.TINSTRUCTION, position);
+    if (labelToken === undefined) return undefined;
+    const index = lastDiagnosticsResult.tokensMap.get(position.line)!.tokens.indexOf(labelToken);
+    // ENDのように命令と同じ名前のラベルの場合があるので
+    // 3番目以降のトークンならばラベルであるとしている
+    // また行の先頭にある場合もラベルである
+    const isLabel = index == 0 || index > 2;
+    return isLabel ? labelToken : undefined;
 }
 
 export function getTokenOfTypeAtPosition(type: TokenType, position: Position): TokenInfo | undefined {
