@@ -414,16 +414,17 @@ function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position) {
     const last = filtered[filtered.length - 1];
     const accept = last.type == TokenType.TCOMMASPACE || last.type == TokenType.TSPACE || last.type == TokenType.TGR;
 
-    if (!accept && !labelDefined()) {
+    if (!accept && !acceptLabel()) {
         filtered.pop();
     }
     return filtered;
 
-    function labelDefined(): boolean {
+    function acceptLabel(): boolean {
         if (isAddressToken(last.type)) {
-            const scope = getScopeFromPosition(position);
-            const labelDefined = lastDiagnosticsResult.labelMap.get(last.value, scope) !== undefined;
-            return labelDefined;
+            // GR名とマッチする限りはGRとして解釈する
+            const regex = /\b(G|GR|GR\d)\b/;
+            const match = last.value.match(regex) || undefined;
+            return match === undefined;
         } else {
             return false;
         }
