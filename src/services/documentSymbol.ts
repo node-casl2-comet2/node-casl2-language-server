@@ -1,6 +1,6 @@
 "use strict";
 
-import { SymbolInformation, SymbolKind } from "vscode-languageserver";
+import { SymbolInformation, SymbolKind, Range, Position } from "vscode-languageserver";
 import { lastDiagnosticsResult, getScopeFromLine, createRangeFromTokenInfo } from "./core";
 import { TokenInfo } from "@maxfield/node-casl2-core";
 
@@ -10,12 +10,15 @@ const enableLabelScope = true;
 export function documentSymbol(uri: string): Array<SymbolInformation> {
     const { subroutineLabels, labels } = lastDiagnosticsResult.labelMap.getAllLabels();
 
-    const a = subroutineLabels.map(x => convertTokenToSymbolInformation(x, SymbolKind.Function));
-    const b = labels.map(x => {
+    // サブルーチンのシンボル情報を作る
+    const subroutineSymbols = subroutineLabels
+        .map(x => convertTokenToSymbolInformation(x, SymbolKind.Function, subroutineLabelTokenToRange(x)));
+    // ラベルのシンボル情報を作る
+    const labelSymbols = labels.map(x => {
         const containerName = enableLabelScope ? getSubroutineNameFromLine(x.line) : undefined;
-        return convertTokenToSymbolInformation(x, SymbolKind.Field, containerName);
+        return convertTokenToSymbolInformation(x, SymbolKind.Field, createRangeFromTokenInfo(x), containerName);
     });
-    const information = a.concat(b);
+    const information = subroutineSymbols.concat(labelSymbols);
 
     return information;
 
@@ -26,7 +29,16 @@ export function documentSymbol(uri: string): Array<SymbolInformation> {
         return a && a.value;
     }
 
-    function convertTokenToSymbolInformation(token: TokenInfo, kind: SymbolKind, containerName?: string) {
-        return SymbolInformation.create(token.value, kind, createRangeFromTokenInfo(token), uri, containerName);
+    function convertTokenToSymbolInformation(token: TokenInfo, kind: SymbolKind, range: Range, containerName?: string) {
+        return SymbolInformation.create(token.value, kind, range, uri, containerName);
     }
+}
+
+function subroutineLabelTokenToRange(token: TokenInfo): Range {
+    const scopes = Array.from(lastDiagnosticsResult.scopeMap.values());
+    const scope = getScopeFromLine(token.line);
+    const start = scopes.indexOf(scope);
+    const end = scopes.lastIndexOf(scope);
+
+    return Range.create(Position.create(start, 0), Position.create(end, 0));
 }
