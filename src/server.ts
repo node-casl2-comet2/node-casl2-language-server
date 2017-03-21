@@ -91,14 +91,8 @@ connection.onSignatureHelp(({ textDocument, position }) => LanguageServices.sign
 
 // 設定変更時に発行される
 connection.onDidChangeConfiguration((change) => {
-    const settings = (change.settings as Settings).casl2;
-
-    const newOption: Casl2CompileOption = {
-        useGR8: settings.useGR8AsSp,
-        enableLabelScope: settings.enableLabelScope
-    };
-
-    updateOption(newOption);
+    const newCasl2Options = (change.settings as Settings).casl2;
+    updateOption(newCasl2Options);
 
     // すべてのファイルを再検証する
     documents.all().forEach(validateTextDocument);
