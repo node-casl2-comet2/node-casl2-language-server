@@ -117,8 +117,6 @@ connection.onDidChangeConfiguration((change) => {
 
 // テキストファイルを検証する
 function validateTextDocument(textDocument: TextDocument): void {
-    console.log("ON CHANGE CONTENT");
-
     // 行のリストにする
     const lines = textDocument.getText().split(/\r?\n/g);
 
@@ -127,16 +125,6 @@ function validateTextDocument(textDocument: TextDocument): void {
     // 検証情報をクライアントに送る
     connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: diagnostics });
 }
-
-connection.onDidChangeWatchedFiles((change) => {
-    // 監視しているファイルがvscodeで変更された
-    connection.console.log("We recevied an file change event");
-});
-
-// 追加の情報を補完リストに与える
-connection.onCompletionResolve((item: CompletionItem): CompletionItem => {
-    return item;
-});
 
 // 接続を待ち受ける
 connection.listen();

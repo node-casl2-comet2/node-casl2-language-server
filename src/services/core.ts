@@ -128,8 +128,6 @@ export function analyzeState(position: Position): void {
 
     if (!shouldAnalyzeState()) return;
 
-    console.log("Analyzing  State");
-
     documentUpdated = false;
 
     if (!lastDiagnosticsResult) return;
