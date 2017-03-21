@@ -303,6 +303,26 @@ export function analyzeState(position: Position): void {
             break;
 
 
+        case ArgumentType.adr_adr:
+            // e.g. IN |
+            if (instSpace()) {
+                argIndex = 0;
+                overload = 0;
+                completionItems = Completion.Labels;
+            }
+            // e.g. IN BUF, |
+            else if (instSpaceTrailing(TokenType.TADDRESS, TokenType.TCOMMASPACE)) {
+                argIndex = 1;
+                overload = 0;
+                completionItems = Completion.Labels;
+            }
+            // e.g. IN BUF, LEN|
+            else if (instSpaceTrailing(TokenType.TADDRESS, TokenType.TCOMMASPACE, TokenType.TADDRESS)) {
+                completeInstructionLine();
+            }
+            break;
+
+
         case ArgumentType.r1_r2:
             // r1, r2パターンのみの命令は存在しないので
             // r1_r2_OR_r1_adr_r2で処理されるはず
