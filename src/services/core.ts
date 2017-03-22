@@ -32,12 +32,10 @@ export namespace LanguageServices {
     export const findAllReferences = FindAllReferences;
 }
 
-let currentOption: Casl2CompileOption;
-export function getCurrentOption() {
-    return currentOption;
+export function getCurrentOption(): Casl2CompileOption {
+    return casl2.compileOption;
 }
 export function updateOption(option: Casl2CompileOption) {
-    currentOption = option;
     casl2.changeCompileOption(option);
 }
 
