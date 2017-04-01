@@ -12,6 +12,7 @@ import {
 import { validateSource, LanguageServices, updateOption } from "./services/core";
 import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 import { Settings } from "./serverSettings";
+import * as linter from "./linter";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -60,6 +61,9 @@ connection.onInitialize((params): InitializeResult => {
 // ファイルの内容が変更された時のイベント。
 // このイベントはファイルが最初に開かれた時と内容が変更された時に発行される。
 documents.onDidChangeContent(change => validateTextDocument(change.document));
+
+// linterを発動する
+documents.onDidChangeContent(change => linter.validateDocument(change.document, connection));
 
 // 補完を提供する
 connection.onCompletion(textDocumentPosition => LanguageServices.completion(textDocumentPosition.position));
