@@ -74,27 +74,62 @@ export function codeAction(params: CodeActionParams): Command[] {
     const autoFixMap = codeFixActions.get(uri);
     if (!autoFixMap) return [];
 
-    let documentVersion: number = -1;
+    const autofixOfDiagnostic = getAutoFixOfDiagnostics(context.diagnostics, autoFixMap);
+    if (autofixOfDiagnostic === undefined) return [];
+
     const commands: Command[] = [];
-    // context.diagnosticsにはカーソル位置に出ている
-    // Diagnosticsが入っている
-    for (const diagnostic of context.diagnostics) {
-        const autofix = autoFixMap.get(computeKey(diagnostic));
-        if (autofix) {
-            documentVersion = autofix.documentVersion;
-            const args = [uri, documentVersion, createTextEdit(autofix)]
-            commands.push(Command.create(
-                autofix.label, Commands.ApplySingleFix, ...args
-            ));
-        }
+    const { documentVersion } = autofixOfDiagnostic;
+
+    const args = [uri, documentVersion, [createTextEdit(autofixOfDiagnostic)]]
+    commands.push(Command.create(
+        `問題を修正: ${autofixOfDiagnostic.fix.message}`, Commands.ApplySingleFix, ...args
+    ));
+
+    const allAutoFixes = Array.from(autoFixMap.values());
+    const sameRuleFixes = collectSameRuleAllFixes(autofixOfDiagnostic.fix.ruleName, allAutoFixes);
+    if (sameRuleFixes.length >= 2) {
+        const args = [uri, documentVersion, sameRuleFixes.map(createTextEdit)];
+        commands.push(Command.create(
+            `同じ種類の問題を修正: ${autofixOfDiagnostic.fix.message}`, Commands.ApplyAllSameRuleFixes, ...args
+        ));
+    }
+
+    if (allAutoFixes.length >= 2) {
+        const args = [uri, documentVersion, allAutoFixes.map(createTextEdit)]
+        commands.push(Command.create(
+            "すべての問題を修正", Commands.ApplyAllFixes, ...args
+        ));
     }
 
     return commands;
+
+    function getAutoFixOfDiagnostics(diagnostics: Diagnostic[], autoFixMap: AutoFixMap): AutoFix | undefined {
+        // context.diagnosticsにはカーソル位置に出ている
+        // Diagnosticsが入っている
+        for (const diagnostic of diagnostics) {
+            const autofix = autoFixMap.get(computeKey(diagnostic));
+            if (autofix) {
+                return autofix;
+            }
+        }
+
+        return undefined;
+    }
+
+    function collectSameRuleAllFixes(ruleName: string, allAutoFixes: AutoFix[]) {
+        const sameRuleFixes: AutoFix[] = [];
+        for (const autofix of allAutoFixes) {
+            if (autofix.fix.ruleName === ruleName) {
+                sameRuleFixes.push(autofix);
+            }
+        }
+
+        return sameRuleFixes;
+    }
 }
 
 function createAutoFix(fix: Fix, document: TextDocument): AutoFix {
     const autoFix: AutoFix = {
-        label: `問題を修正: ${fix.message}`,
         documentVersion: document.version,
         fix: fix,
         edit: createAutoFixEdit(fix)

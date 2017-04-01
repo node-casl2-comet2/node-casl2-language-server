@@ -11,7 +11,6 @@ export interface AutoFixEdit {
 }
 
 export interface AutoFix {
-    label: string;
     documentVersion: number;
     fix: Fix;
     edit: AutoFixEdit;
