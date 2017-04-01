@@ -7,6 +7,7 @@ import {
     TextEdit
 } from "vscode-languageserver";
 import { Linter, Fix } from "@maxfield/casl2-lint";
+import { FixAllProblemsRequestParams, FixAllProblemsRequestResponse } from "../ipc/types";
 import { AutoFixMap, AutoFixEdit, AutoFix } from "./types";
 import { Commands } from "../constants";
 
@@ -66,6 +67,28 @@ function recordCodeAction(document: TextDocument, diagnostic: Diagnostic, fix: F
     }
 
     autoFixMap.set(computeKey(diagnostic), createAutoFix(fix, document));
+}
+
+export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
+    const { textDocument } = params;
+    const noFixesReponse = {
+        documentVersion: -1,
+        textEdits: []
+    };
+
+    const autoFixMap = codeFixActions.get(textDocument.uri);
+    if (!autoFixMap) return noFixesReponse;
+
+    const allAutoFixes = Array.from(autoFixMap.values());
+    if (allAutoFixes.length == 0) return noFixesReponse;
+
+    const textEdits = allAutoFixes.map(createTextEdit);
+    const response = {
+        documentVersion: allAutoFixes[0].documentVersion,
+        textEdits: textEdits
+    };
+
+    return response;
 }
 
 export function codeAction(params: CodeActionParams): Command[] {

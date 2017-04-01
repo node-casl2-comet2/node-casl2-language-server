@@ -7,12 +7,13 @@ import {
     TextDocuments, TextDocument, Diagnostic, DiagnosticSeverity,
     InitializeParams, InitializeResult, TextDocumentPositionParams,
     CompletionItem, CompletionItemKind, Position,
-    SignatureHelp, Location
+    SignatureHelp, Location, RequestType
 } from "vscode-languageserver";
 import { validateSource, LanguageServices, updateOption } from "./services/core";
 import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 import { Settings } from "./serverSettings";
 import * as linter from "./linter/linter";
+import { FixAllProblemsRequestParams, FixAllProblemsRequestResponse } from "./ipc/types";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -106,6 +107,11 @@ connection.onDidChangeConfiguration((change) => {
 
 // CodeAction時に呼ばれる
 connection.onCodeAction((params) => linter.codeAction(params));
+
+// カスタムリクエストを処理する
+connection.onRequest(
+    new RequestType<FixAllProblemsRequestParams, FixAllProblemsRequestResponse, void, void>("textDocument/casl2-lint/fixAllProblems"),
+    (params) => linter.fixAllProblems(params));
 
 // テキストファイルを検証する
 function validateTextDocument(textDocument: TextDocument): void {
