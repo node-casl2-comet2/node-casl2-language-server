@@ -12,7 +12,7 @@ import {
 import { validateSource, LanguageServices, updateOption } from "./services/core";
 import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 import { Settings } from "./serverSettings";
-import * as linter from "./linter";
+import * as linter from "./linter/linter";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -53,7 +53,9 @@ connection.onInitialize((params): InitializeResult => {
             // 関数の引数の説明を表示する
             signatureHelpProvider: {
                 triggerCharacters: [",", " "]
-            }
+            },
+            // CodeAction(vscodeでは電球マークがでる)に対応
+            codeActionProvider: true
         }
     }
 });
@@ -101,6 +103,9 @@ connection.onDidChangeConfiguration((change) => {
     // すべてのファイルを再検証する
     documents.all().forEach(validateTextDocument);
 });
+
+// CodeAction時に呼ばれる
+connection.onCodeAction((params) => linter.codeAction(params));
 
 // テキストファイルを検証する
 function validateTextDocument(textDocument: TextDocument): void {
