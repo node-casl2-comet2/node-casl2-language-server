@@ -170,8 +170,8 @@ function createAutoFix(fix: Fix, document: TextDocument): AutoFix {
 function createAutoFixEdit(fix: Fix): AutoFixEdit {
     const edit: AutoFixEdit = {
         range: {
-            start: fix.start,
-            end: fix.end
+            start: fix.replacementStartPosition,
+            end: fix.replacementEndPosition
         },
         text: fix.replacementText
     };
