@@ -490,10 +490,44 @@ export function createLocationFromToken(uri: string, token: TokenInfo): Location
     };
 }
 
-export function getScopeFromLine(line: number) {
-    const scope = lastDiagnosticsResult.scopeMap.get(line);
-    if (scope === undefined) throw new Error();
-    return scope;
+
+
+export function getScopeFromLine(line: number): number {
+    const { scopeMap, subroutinesInfo, instructions } = lastDiagnosticsResult;
+    const scope = scopeMap.get(line);
+
+    if (scope !== undefined) return scope;
+
+    // もしscopeMapに登録されていない場合は前の行へと遡る
+    const result = scopeBackwardSearch(line);
+    if (result === undefined) {
+        return 1;
+    } else {
+        const options = getCurrentOption();
+        const [scope, line] = result;
+        if (options.enableLabelScope) {
+            // スコープの変更点(END命令)ならば
+            // 1足したスコープを返す
+            const subroutine = subroutinesInfo.find(x => x.endLine === line);
+            return subroutine === undefined
+                ? scope
+                : scope + 1;
+        } else {
+            return scope;
+        }
+    }
+
+    function scopeBackwardSearch(line: number): [number, number] | undefined {
+        const l = line - 1;
+        if (l < 0) return undefined;
+
+        const scope = scopeMap.get(l);
+        if (scope === undefined) {
+            return scopeBackwardSearch(l);
+        } else {
+            return [scope, l];
+        }
+    }
 }
 
 function getScopeFromPosition(position: Position) {
