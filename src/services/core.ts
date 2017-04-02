@@ -20,6 +20,7 @@ import { documentSymbol as DocumentSymbol } from "./documentSymbol";
 import { signatureHelp as SignatureHelp } from "./signatureHelp";
 import { gotoDefinition as GotoDefinition } from "./gotoDefinition";
 import { findAllReferences as FindAllReferences } from "./findAllReferences";
+import { documentFormatting as DocumentFormatting } from "./formatting";
 
 export namespace LanguageServices {
     export const hover = Hover;
@@ -30,6 +31,7 @@ export namespace LanguageServices {
     export const signatureHelp = SignatureHelp;
     export const gotoDefinition = GotoDefinition;
     export const findAllReferences = FindAllReferences;
+    export const documentFormatting = DocumentFormatting;
 }
 
 export function getCurrentOption(): Casl2CompileOption {

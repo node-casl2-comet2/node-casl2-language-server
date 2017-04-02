@@ -69,18 +69,24 @@ function recordCodeAction(document: TextDocument, diagnostic: Diagnostic, fix: F
     autoFixMap.set(computeKey(diagnostic), createAutoFix(fix, document));
 }
 
-export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
-    const { textDocument } = params;
-    const noFixesReponse = {
-        documentVersion: -1,
-        textEdits: []
-    };
-
-    const autoFixMap = codeFixActions.get(textDocument.uri);
-    if (!autoFixMap) return noFixesReponse;
+export function getAllAutoFixes(uri: string): AutoFix[] | undefined {
+    const autoFixMap = codeFixActions.get(uri);
+    if (!autoFixMap) return undefined;
 
     const allAutoFixes = Array.from(autoFixMap.values());
-    if (allAutoFixes.length == 0) return noFixesReponse;
+    return allAutoFixes;
+}
+
+export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
+    const allAutoFixes = getAllAutoFixes(params.textDocument.uri);
+    if (allAutoFixes === undefined || allAutoFixes.length == 0) {
+        const response = {
+            documentVersion: -1,
+            textEdits: []
+        };
+
+        return response;
+    }
 
     const textEdits = allAutoFixes.map(createTextEdit);
     const response = {
@@ -173,7 +179,7 @@ function createAutoFixEdit(fix: Fix): AutoFixEdit {
     return edit;
 };
 
-function createTextEdit(autofix: AutoFix): TextEdit {
+export function createTextEdit(autofix: AutoFix): TextEdit {
     return TextEdit.replace(
         autofix.edit.range,
         autofix.edit.text

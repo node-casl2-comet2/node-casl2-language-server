@@ -56,7 +56,9 @@ connection.onInitialize((params): InitializeResult => {
                 triggerCharacters: [",", " "]
             },
             // CodeAction(vscodeでは電球マークがでる)に対応
-            codeActionProvider: true
+            codeActionProvider: true,
+            // ドキュメント全体のコード整形に対応
+            documentFormattingProvider: true
         }
     }
 });
@@ -107,6 +109,9 @@ connection.onDidChangeConfiguration((change) => {
 
 // CodeAction時に呼ばれる
 connection.onCodeAction((params) => linter.codeAction(params));
+
+// Document formatting
+connection.onDocumentFormatting((params) => LanguageServices.documentFormatting(params));
 
 // カスタムリクエストを処理する
 connection.onRequest(
