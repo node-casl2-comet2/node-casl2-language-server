@@ -14,13 +14,6 @@ import { Commands } from "../constants";
 // コード自動修正のマップ (URI -> AutoFixMap)
 const codeFixActions: Map<string, AutoFixMap> = new Map();
 
-
-export function validateDocument(document: TextDocument, connection: IConnection): void {
-    const { uri } = document;
-    const diagnostics = diagnoseSource(document);
-    connection.sendDiagnostics({ uri, diagnostics });
-}
-
 export function diagnoseSource(document: TextDocument): Diagnostic[] {
     const content = document.getText();
     const linter = new Linter();

@@ -8,7 +8,7 @@ import {
     instructionCompletionItems, grCompletionItems, indexGRCompletionItems,
     createLabelCompletionItems, Completion
 } from "./completion";
-import { Diagnostic, DiagnosticSeverity, Position, CompletionItem, Range, Location } from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity, Position, CompletionItem, Range, Location, TextDocument } from "vscode-languageserver";
 import { instructionMap, isAddressToken, AllReferences } from "@maxfield/node-casl2-core";
 import { ArgumentType } from "@maxfield/node-casl2-comet2-core-common";
 
@@ -44,6 +44,14 @@ export function updateOption(option: Casl2CompileOption) {
 const casl2 = new Casl2();
 
 export let lastDiagnosticsResult: Casl2DiagnosticResult;
+
+// テキストファイルを検証する
+export function validateTextDocument(textDocument: TextDocument): Diagnostic[] {
+    // 行のリストにする
+    const lines = textDocument.getText().split(/\r?\n/g);
+    const diagnostics = validateSource(lines);
+    return diagnostics;
+}
 
 export function validateSource(lines: Array<string>): Array<Diagnostic> {
     documentUpdated = true;

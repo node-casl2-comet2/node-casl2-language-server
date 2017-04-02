@@ -14,6 +14,8 @@ import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 import { Settings } from "./serverSettings";
 import * as linter from "./linter/linter";
 import { FixAllProblemsRequestParams, FixAllProblemsRequestResponse } from "./ipc/types";
+import * as Rx from "@reactivex/rxjs";
+import { validateTextDocument } from "./services/core";
 
 // サーバー用のコネクションを作成する
 const connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
@@ -65,10 +67,7 @@ connection.onInitialize((params): InitializeResult => {
 
 // ファイルの内容が変更された時のイベント。
 // このイベントはファイルが最初に開かれた時と内容が変更された時に発行される。
-documents.onDidChangeContent(change => validateTextDocument(change.document));
-
-// linterを発動する
-documents.onDidChangeContent(change => linter.validateDocument(change.document, connection));
+documents.onDidChangeContent(change => triggerAnalyzeDocument(change.document, connection));
 
 // 補完を提供する
 connection.onCompletion(textDocumentPosition => LanguageServices.completion(textDocumentPosition.position));
@@ -118,16 +117,23 @@ connection.onRequest(
     new RequestType<FixAllProblemsRequestParams, FixAllProblemsRequestResponse, void, void>("textDocument/casl2-lint/fixAllProblems"),
     (params) => linter.fixAllProblems(params));
 
-// テキストファイルを検証する
-function validateTextDocument(textDocument: TextDocument): void {
-    // 行のリストにする
-    const lines = textDocument.getText().split(/\r?\n/g);
-
-    const diagnostics = validateSource(lines);
-
-    // 検証情報をクライアントに送る
-    connection.sendDiagnostics({ uri: textDocument.uri, diagnostics: diagnostics });
-}
-
 // 接続を待ち受ける
 connection.listen();
+
+// debounce: 一定時間値が流れなければ，直前の値で発火する
+const subject = new Rx.Subject<[TextDocument, IConnection]>();
+subject
+    .debounceTime(200)
+    .subscribe(([document, connection]) => {
+        const { uri } = document;
+
+        const languageServiceDiagnostics = validateTextDocument(document);
+        const linterDiagnostics = linter.diagnoseSource(document);
+        const diagnostics = languageServiceDiagnostics.concat(linterDiagnostics);
+
+        connection.sendDiagnostics({ uri, diagnostics });
+    });
+
+function triggerAnalyzeDocument(document: TextDocument, connection: IConnection) {
+    subject.next([document, connection]);
+}
