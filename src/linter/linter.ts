@@ -27,6 +27,11 @@ export function diagnoseSource(document: TextDocument): Diagnostic[] {
 
     const content = document.getText();
     const linter = new Linter();
+
+    // ファイル作成直後にそのファイルが存在しないという
+    // エラーになるのを回避する
+    if (content === "") return [];
+
     const result = linter.analyze(document.uri, content);
     const diagnostics: Diagnostic[] = [];
 
