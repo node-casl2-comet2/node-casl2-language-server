@@ -102,8 +102,11 @@ connection.onDidChangeConfiguration((change) => {
     const newCasl2Options = (change.settings as Settings).casl2;
     updateOption(newCasl2Options);
 
+    const linterEnabled = newCasl2Options.linter !== undefined && newCasl2Options.linter.enabled;
+    linter.setEnabled(linterEnabled);
+
     // すべてのファイルを再検証する
-    documents.all().forEach(validateTextDocument);
+    documents.all().forEach(document => triggerAnalyzeDocument(document, connection));
 });
 
 // CodeAction時に呼ばれる

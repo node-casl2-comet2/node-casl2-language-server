@@ -14,14 +14,21 @@ import { Commands } from "../constants";
 // コード自動修正のマップ (URI -> AutoFixMap)
 const codeFixActions: Map<string, AutoFixMap> = new Map();
 
+let linterEnabled = true;
+export function setEnabled(enabled: boolean) {
+    linterEnabled = enabled;
+}
+
 export function diagnoseSource(document: TextDocument): Diagnostic[] {
+    // 古いCodeActionsを破棄する
+    codeFixActions.delete(document.uri);
+
+    if (!linterEnabled) return [];
+
     const content = document.getText();
     const linter = new Linter();
     const result = linter.analyze(document.uri, content);
     const diagnostics: Diagnostic[] = [];
-
-    // 古いCodeActionsを破棄する
-    codeFixActions.delete(document.uri);
 
     for (const fix of result.fixes) {
         const diagnostic = createDiagnosticFromFix(fix);
