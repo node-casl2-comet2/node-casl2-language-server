@@ -19,9 +19,17 @@ export function setEnabled(enabled: boolean) {
     linterEnabled = enabled;
 }
 
-export function diagnoseSource(document: TextDocument): Diagnostic[] {
+/**
+ * ファイルに関連するデータを破棄します
+ * @param uri File URI
+ */
+export function dispose(uri: string): void {
     // 古いCodeActionsを破棄する
-    codeFixActions.delete(document.uri);
+    codeFixActions.delete(uri);
+}
+
+export function diagnoseSource(document: TextDocument): Diagnostic[] {
+    dispose(document.uri);
 
     if (!linterEnabled) return [];
 

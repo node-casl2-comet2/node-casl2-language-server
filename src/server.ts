@@ -7,7 +7,7 @@ import {
     TextDocuments, TextDocument, Diagnostic, DiagnosticSeverity,
     InitializeParams, InitializeResult, TextDocumentPositionParams,
     CompletionItem, CompletionItemKind, Position,
-    SignatureHelp, Location, RequestType
+    SignatureHelp, Location, RequestType, TextDocumentChangeEvent
 } from "vscode-languageserver";
 import { validateSource, LanguageServices, updateOption } from "./services/core";
 import { Casl2CompileOption } from "@maxfield/node-casl2-core";
@@ -68,6 +68,8 @@ connection.onInitialize((params): InitializeResult => {
 // ファイルの内容が変更された時のイベント。
 // このイベントはファイルが最初に開かれた時と内容が変更された時に発行される。
 documents.onDidChangeContent(change => triggerAnalyzeDocument(change.document, connection));
+
+documents.onDidClose((change) => handleDocumentClose(change));
 
 // 補完を提供する
 connection.onCompletion(textDocumentPosition => LanguageServices.completion(textDocumentPosition.position));
@@ -139,4 +141,13 @@ subject
 
 function triggerAnalyzeDocument(document: TextDocument, connection: IConnection) {
     subject.next([document, connection]);
+}
+
+function handleDocumentClose(change: TextDocumentChangeEvent): void {
+    const uri = change.document.uri;
+
+    linter.dispose(uri);
+
+    // ファイルが閉じられた時にそのファイルのDiagnosticsを空にする
+    connection.sendDiagnostics({ uri: uri, diagnostics: [] });
 }
