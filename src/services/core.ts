@@ -46,22 +46,23 @@ const casl2 = new Casl2();
 export let lastDiagnosticsResult: Casl2DiagnosticResult;
 
 // テキストファイルを検証する
-export function validateTextDocument(textDocument: TextDocument): Diagnostic[] {
+export function validateTextDocument(textDocument: TextDocument): void {
     // 行のリストにする
     const lines = textDocument.getText().split(/\r?\n/g);
-    const diagnostics = validateSource(lines);
-    return diagnostics;
+    validateSource(lines);
 }
 
-export function validateSource(lines: Array<string>): Array<Diagnostic> {
+export function getCurrenctDiagnostics(): Diagnostic[] {
+    return lastDiagnosticsResult.diagnostics.map(convertDiagnostic);
+}
+
+export function validateSource(lines: Array<string>): void {
     documentUpdated = true;
 
     const diagnosticResult = casl2.analyze(lines);
     const { diagnostics } = diagnosticResult;
 
     lastDiagnosticsResult = diagnosticResult;
-
-    return diagnostics.map(convertDiagnostic);
 }
 
 function convertDiagnostic(diagnostic: Casl2Diagnostic): Diagnostic {

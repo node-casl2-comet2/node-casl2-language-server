@@ -9,7 +9,7 @@ import {
     CompletionItem, CompletionItemKind, Position,
     SignatureHelp, Location, RequestType, TextDocumentChangeEvent
 } from "vscode-languageserver";
-import { validateSource, LanguageServices, updateOption } from "./services/core";
+import { validateSource, LanguageServices, updateOption, getCurrenctDiagnostics } from "./services/core";
 import { Casl2CompileOption } from "@maxfield/node-casl2-core";
 import { Settings } from "./serverSettings";
 import * as linter from "./linter/linter";
@@ -67,7 +67,8 @@ connection.onInitialize((params): InitializeResult => {
 
 // ファイルの内容が変更された時のイベント。
 // このイベントはファイルが最初に開かれた時と内容が変更された時に発行される。
-documents.onDidChangeContent(change => triggerAnalyzeDocument(change.document, connection));
+documents.onDidChangeContent(change => validateTextDocument(change.document));
+documents.onDidChangeContent(change => triggerLinterAnalysis(change.document, connection));
 
 documents.onDidClose((change) => handleDocumentClose(change));
 
@@ -108,7 +109,7 @@ connection.onDidChangeConfiguration((change) => {
     linter.setEnabled(linterEnabled);
 
     // すべてのファイルを再検証する
-    documents.all().forEach(document => triggerAnalyzeDocument(document, connection));
+    documents.all().forEach(document => triggerLinterAnalysis(document, connection));
 });
 
 // CodeAction時に呼ばれる
@@ -132,14 +133,14 @@ subject
     .subscribe(([document, connection]) => {
         const { uri } = document;
 
-        const languageServiceDiagnostics = validateTextDocument(document);
+        const languageServiceDiagnostics = getCurrenctDiagnostics();
         const linterDiagnostics = linter.diagnoseSource(document);
         const diagnostics = languageServiceDiagnostics.concat(linterDiagnostics);
 
         connection.sendDiagnostics({ uri, diagnostics });
     });
 
-function triggerAnalyzeDocument(document: TextDocument, connection: IConnection) {
+function triggerLinterAnalysis(document: TextDocument, connection: IConnection) {
     subject.next([document, connection]);
 }
 
