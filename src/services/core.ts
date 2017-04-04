@@ -177,15 +177,20 @@ export function analyzeState(position: Position): void {
     // 1. カーソルが先頭の空白の右側である
     // 2. カーソルがラベルの右側である
 
-    function space(tokens: Array<TokenInfo>, position: Position): boolean {
-        if (beforeCursorTokens.length == 1) {
-            return consume(TokenType.TSPACE);
-        } else {
-            return false;
-        }
+    function leadingSpace(tokens: Array<TokenInfo>, position: Position): boolean {
+        if (tokens.length == 2) {
+            return tokens[0].type == TokenType.TSPACE && tokens[0].endIndex <= position.character;
+        } else if (tokens.length == 1) {
+            return tokens[0].type == TokenType.TSPACE;
+        } else return false;
     }
 
-    if (space(tokens, position) || consume(TokenType.TLABEL, TokenType.TSPACE)) {
+    function leadingLabelSpace(tokens: Array<TokenInfo>, position: Position): boolean {
+        const slice = tokens.slice(1);
+        return leadingSpace(slice, position);
+    }
+
+    if (leadingSpace(tokens, position) || leadingLabelSpace(tokens, position)) {
         // 命令
         completionItems = Completion.Instruction;
     } else {
