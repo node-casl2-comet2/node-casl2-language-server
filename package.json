@@ -1,6 +1,6 @@
 {
   "name": "@maxfield/node-casl2-language-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "CASL2 language server conforming to Microsoft's Language Server Protocol",
   "main": "dist/src/server.js",
   "types": "dist/src/index.d.ts",
@@ -26,6 +26,7 @@
     "typescript": "^2.2.1"
   },
   "dependencies": {
+    "@maxfield/casl2-lint": "^1.0.0",
     "@maxfield/node-casl2-core": "^1.2.0",
     "@reactivex/rxjs": "^5.2.1-smooth",
     "lodash": "^4.17.4",
