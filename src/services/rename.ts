@@ -10,7 +10,7 @@ export function rename(uri: string, version: number, position: Position, newName
     const edits = highlights.map(x => TextEdit.replace(x.range, newName));
 
     return {
-        changes: [
+        documentChanges: [
             {
                 textDocument: { uri: uri, version: version },
                 edits: edits
