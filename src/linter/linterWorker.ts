@@ -66,6 +66,9 @@ export class LinterWoker {
     }
 
     public getAllAutoFixes(): AutoFix[] {
+        // 現在のdocument versionのソースが解析済みかチェックする
+        if (this._lastDiagnoseDocumentVersion != this._documentVersion) throw new Error();
+
         return Array.from(this._autoFixMap.values());
     }
 }

@@ -103,25 +103,26 @@ export function codeAction(params: CodeActionParams): Command[] {
 }
 
 export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
-    const worker = getWorker(params.textDocument.uri);
+    if (isEnabled()) {
+        const worker = getWorker(params.textDocument.uri);
 
-    const allAutoFixes = worker.getAllAutoFixes();
-    if (allAutoFixes === undefined || allAutoFixes.length == 0) {
+        worker.diagnoseSource();
+        const allAutoFixes = worker.getAllAutoFixes();
+
+        const textEdits = allAutoFixes.map(createTextEdit);
+        const response = {
+            documentVersion: allAutoFixes.length > 0 ? allAutoFixes[0].documentVersion : -1,
+            textEdits: textEdits
+        };
+
+        return response;
+    } else {
         const response = {
             documentVersion: -1,
             textEdits: []
         };
-
         return response;
     }
-
-    const textEdits = allAutoFixes.map(createTextEdit);
-    const response = {
-        documentVersion: allAutoFixes[0].documentVersion,
-        textEdits: textEdits
-    };
-
-    return response;
 }
 
 export function createTextEdit(autofix: AutoFix): TextEdit {
