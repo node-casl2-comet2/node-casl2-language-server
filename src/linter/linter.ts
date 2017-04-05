@@ -10,113 +10,45 @@ import { Linter, Fix } from "@maxfield/casl2-lint";
 import { FixAllProblemsRequestParams, FixAllProblemsRequestResponse } from "../ipc/types";
 import { AutoFixMap, AutoFixEdit, AutoFix } from "./types";
 import { Commands } from "../constants";
+import { LinterWoker } from "./linterWorker";
 
 // コード自動修正のマップ (URI -> AutoFixMap)
-const codeFixActions: Map<string, AutoFixMap> = new Map();
+// const codeFixActions: Map<string, AutoFixMap> = new Map();
+// (URI -> LinterWorker)
+const linterWokerMap: Map<string, LinterWoker> = new Map();
 
 let linterEnabled = true;
 export function setEnabled(enabled: boolean) {
     linterEnabled = enabled;
 }
+export function isEnabled(): boolean {
+    return linterEnabled;
+}
 
-/**
- * ファイルに関連するデータを破棄します
- * @param uri File URI
- */
 export function dispose(uri: string): void {
-    // 古いCodeActionsを破棄する
-    codeFixActions.delete(uri);
+    linterWokerMap.delete(uri);
 }
 
-export function diagnoseSource(document: TextDocument): Diagnostic[] {
-    dispose(document.uri);
-
-    if (!linterEnabled) return [];
-
-    const content = document.getText();
-    const linter = new Linter();
-
-    // ファイル作成直後にそのファイルが存在しないという
-    // エラーになるのを回避する
-    if (content === "") return [];
-
-    const result = linter.analyze(document.uri, content);
-    const diagnostics: Diagnostic[] = [];
-
-    for (const fix of result.fixes) {
-        const diagnostic = createDiagnosticFromFix(fix);
-        diagnostics.push(diagnostic);
-        recordCodeAction(document, diagnostic, fix);
-    }
-
-    return diagnostics;
-}
-
-/**
- * Transform Fix object to Diagnostic
- * @param fix Fix object
- */
-function createDiagnosticFromFix(fix: Fix): Diagnostic {
-    const diagnostic: Diagnostic = {
-        severity: DiagnosticSeverity.Warning,
-        message: fix.message,
-        range: {
-            start: fix.start,
-            end: fix.end
-        },
-        code: fix.ruleName,
-        source: "casl2-lint"
-    };
-
-    return diagnostic;
-}
-
-function recordCodeAction(document: TextDocument, diagnostic: Diagnostic, fix: Fix): void {
-    let autoFixMap = codeFixActions.get(document.uri);
-    if (!autoFixMap) {
+export function getWorker(uri: string): LinterWoker {
+    const worker = linterWokerMap.get(uri);
+    if (worker) {
+        return worker;
+    } else {
         // なければ作る
-        autoFixMap = new Map();
-        codeFixActions.set(document.uri, autoFixMap);
+        const worker = new LinterWoker(uri);
+        linterWokerMap.set(uri, worker);
+        return worker;
     }
-
-    autoFixMap.set(computeKey(diagnostic), createAutoFix(fix, document));
-}
-
-export function getAllAutoFixes(uri: string): AutoFix[] | undefined {
-    const autoFixMap = codeFixActions.get(uri);
-    if (!autoFixMap) return undefined;
-
-    const allAutoFixes = Array.from(autoFixMap.values());
-    return allAutoFixes;
-}
-
-export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
-    const allAutoFixes = getAllAutoFixes(params.textDocument.uri);
-    if (allAutoFixes === undefined || allAutoFixes.length == 0) {
-        const response = {
-            documentVersion: -1,
-            textEdits: []
-        };
-
-        return response;
-    }
-
-    const textEdits = allAutoFixes.map(createTextEdit);
-    const response = {
-        documentVersion: allAutoFixes[0].documentVersion,
-        textEdits: textEdits
-    };
-
-    return response;
 }
 
 export function codeAction(params: CodeActionParams): Command[] {
     const { textDocument, context } = params;
     const { uri } = textDocument;
-    const autoFixMap = codeFixActions.get(uri);
-    if (!autoFixMap) return [];
 
-    const autofixOfDiagnostic = getAutoFixOfDiagnostics(context.diagnostics, autoFixMap);
+    const worker = linterWokerMap.get(uri);
+    if (!worker) return [];
+
+    const autofixOfDiagnostic = getAutoFixOfDiagnostics(context.diagnostics, worker.autoFixMap);
     if (autofixOfDiagnostic === undefined) return [];
 
     const commands: Command[] = [];
@@ -127,7 +59,7 @@ export function codeAction(params: CodeActionParams): Command[] {
         `問題を修正: ${autofixOfDiagnostic.fix.message}`, Commands.ApplySingleFix, ...args
     ));
 
-    const allAutoFixes = Array.from(autoFixMap.values());
+    const allAutoFixes = Array.from(worker.autoFixMap.values());
     const sameRuleFixes = collectSameRuleAllFixes(autofixOfDiagnostic.fix.ruleName, allAutoFixes);
     if (sameRuleFixes.length >= 2) {
         const args = [uri, documentVersion, sameRuleFixes.map(createTextEdit)];
@@ -170,27 +102,27 @@ export function codeAction(params: CodeActionParams): Command[] {
     }
 }
 
-function createAutoFix(fix: Fix, document: TextDocument): AutoFix {
-    const autoFix: AutoFix = {
-        documentVersion: document.version,
-        fix: fix,
-        edit: createAutoFixEdit(fix)
+export function fixAllProblems(params: FixAllProblemsRequestParams): FixAllProblemsRequestResponse {
+    const worker = getWorker(params.textDocument.uri);
+
+    const allAutoFixes = worker.getAllAutoFixes();
+    if (allAutoFixes === undefined || allAutoFixes.length == 0) {
+        const response = {
+            documentVersion: -1,
+            textEdits: []
+        };
+
+        return response;
+    }
+
+    const textEdits = allAutoFixes.map(createTextEdit);
+    const response = {
+        documentVersion: allAutoFixes[0].documentVersion,
+        textEdits: textEdits
     };
 
-    return autoFix;
+    return response;
 }
-
-function createAutoFixEdit(fix: Fix): AutoFixEdit {
-    const edit: AutoFixEdit = {
-        range: {
-            start: fix.replacementStartPosition,
-            end: fix.replacementEndPosition
-        },
-        text: fix.replacementText
-    };
-
-    return edit;
-};
 
 export function createTextEdit(autofix: AutoFix): TextEdit {
     return TextEdit.replace(
@@ -199,7 +131,7 @@ export function createTextEdit(autofix: AutoFix): TextEdit {
     );
 }
 
-function computeKey(diagnostic: Diagnostic): string {
+export function computeKey(diagnostic: Diagnostic): string {
     const { range, severity, code } = diagnostic;
     const start = `(${range.start.line}, ${range.start.character})`;
     const end = `(${range.end.line}, ${range.end.character})`;

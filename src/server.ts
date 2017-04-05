@@ -134,10 +134,22 @@ subject
         const { uri } = document;
 
         const languageServiceDiagnostics = getCurrenctDiagnostics();
-        const linterDiagnostics = linter.diagnoseSource(document);
+        const linterDiagnostics = getLinterDiagnostics();
         const diagnostics = languageServiceDiagnostics.concat(linterDiagnostics);
 
         connection.sendDiagnostics({ uri, diagnostics });
+
+        function getLinterDiagnostics() {
+            const worker = linter.getWorker(document.uri);
+            worker.loadDocument(document);
+
+            if (linter.isEnabled()) {
+                worker.diagnoseSource();
+                return worker.diagnostics;
+            } else {
+                return [];
+            }
+        }
     });
 
 function triggerLinterAnalysis(document: TextDocument, connection: IConnection) {

@@ -14,9 +14,10 @@ export function documentFormatting(params: DocumentFormattingParams): TextEdit[]
 }
 
 function getAllTextEditsToFix(uri: string): TextEdit[] {
-    const allAutoFixes = linter.getAllAutoFixes(uri);
-    if (allAutoFixes === undefined) return [];
+    const worker = linter.getWorker(uri);
 
-    const textEdits = allAutoFixes.map(linter.createTextEdit);
-    return textEdits;
+    // linterが有効でなくても強制的に診断させる
+    worker.diagnoseSource();
+
+    return worker.getAllAutoFixes().map(linter.createTextEdit);
 }
