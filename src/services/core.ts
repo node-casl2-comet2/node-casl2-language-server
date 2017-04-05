@@ -178,16 +178,21 @@ export function analyzeState(position: Position): void {
     // 2. カーソルがラベルの右側である
 
     function leadingSpace(tokens: Array<TokenInfo>, position: Position): boolean {
-        if (tokens.length == 2) {
-            return tokens[0].type == TokenType.TSPACE && tokens[0].endIndex <= position.character;
-        } else if (tokens.length == 1) {
-            return tokens[0].type == TokenType.TSPACE;
-        } else return false;
+        const beforeTokens = getTokensBeforePositionIgnoring(tokens, position, TokenType.TSPACE);
+        if (beforeTokens.length >= 1) {
+            return beforeTokens[0].type == TokenType.TSPACE;
+        } else {
+            return false;
+        }
     }
 
     function leadingLabelSpace(tokens: Array<TokenInfo>, position: Position): boolean {
-        const slice = tokens.slice(1);
-        return leadingSpace(slice, position);
+        if (tokens.length >= 1) {
+            const slice = tokens.slice(1);
+            return leadingSpace(slice, position);
+        } else {
+            return false;
+        }
     }
 
     if (leadingSpace(tokens, position) || leadingLabelSpace(tokens, position)) {
@@ -410,6 +415,25 @@ export function analyzeState(position: Position): void {
     }
 }
 
+function getTokensBeforePositionIgnoring(tokens: TokenInfo[], position: Position, ...notIgnoringTypes: TokenType[]): TokenInfo[] {
+    const filtered = tokens.filter(x => x.startIndex < position.character);
+    if (filtered.length == 0) {
+        return [];
+    }
+    const last = filtered[filtered.length - 1];
+    const acceptLast = notIgnoringTypes.some((x) => last.type == x);
+
+    if (!acceptLast) {
+        filtered.pop();
+    }
+
+    return filtered;
+}
+
+/**
+ * カーソルより前のトークンの配列(ただし，末尾のトークンがCommaSpace, Space, GR, Label以外の場合そのトークンは除外)
+ * を取得
+ */
 function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): Array<TokenInfo> {
     const filtered = tokens.filter(x => x.endIndex <= position.character);
     if (filtered.length == 0) {
