@@ -62,7 +62,7 @@ connection.onInitialize((params): InitializeResult => {
             // ドキュメント全体のコード整形に対応
             documentFormattingProvider: true
         }
-    }
+    };
 });
 
 // ファイルの内容が変更された時のイベント。

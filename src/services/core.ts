@@ -56,7 +56,7 @@ export function getCurrenctDiagnostics(): Diagnostic[] {
     return lastDiagnosticsResult.diagnostics.map(convertDiagnostic);
 }
 
-export function validateSource(lines: Array<string>): void {
+export function validateSource(lines: string[]): void {
     documentUpdated = true;
 
     const diagnosticResult = casl2.analyze(lines);
@@ -149,7 +149,7 @@ export function analyzeState(position: Position): void {
     const tokens = tokensInfo.tokens;
     const beforeCursorTokens = getTokensBeforePosition(tokens, position);
 
-    function consume(...tokenTypes: Array<TokenType>): boolean {
+    function consume(...tokenTypes: TokenType[]): boolean {
         const count = tokenTypes.length;
         if (beforeCursorTokens.length < count) return false;
 
@@ -177,7 +177,7 @@ export function analyzeState(position: Position): void {
     // 1. カーソルが先頭の空白の右側である
     // 2. カーソルがラベルの右側である
 
-    function leadingSpace(tokens: Array<TokenInfo>, position: Position): boolean {
+    function leadingSpace(tokens: TokenInfo[], position: Position): boolean {
         const beforeTokens = getTokensBeforePositionIgnoring(tokens, position, TokenType.TSPACE);
         if (beforeTokens.length >= 1) {
             return beforeTokens[0].type == TokenType.TSPACE;
@@ -186,7 +186,7 @@ export function analyzeState(position: Position): void {
         }
     }
 
-    function leadingLabelSpace(tokens: Array<TokenInfo>, position: Position): boolean {
+    function leadingLabelSpace(tokens: TokenInfo[], position: Position): boolean {
         if (tokens.length >= 1) {
             const slice = tokens.slice(1);
             return leadingSpace(slice, position);
@@ -219,7 +219,7 @@ export function analyzeState(position: Position): void {
     const info = instructionMap.get(inst);
     if (info === undefined) throw new Error();
 
-    function labelCompletionItems(): Array<CompletionItem> {
+    function labelCompletionItems(): CompletionItem[] {
         const labels = getAllReferenceableLabels(position).map(x => x.value);
         return createLabelCompletionItems(labels);
     }
@@ -228,7 +228,7 @@ export function analyzeState(position: Position): void {
         return consume(TokenType.TINSTRUCTION, TokenType.TSPACE);
     }
 
-    function instSpaceTrailing(...tokenTypes: Array<TokenType>): boolean {
+    function instSpaceTrailing(...tokenTypes: TokenType[]): boolean {
         return consume(TokenType.TINSTRUCTION, TokenType.TSPACE, ...tokenTypes);
     }
 
@@ -434,7 +434,7 @@ function getTokensBeforePositionIgnoring(tokens: TokenInfo[], position: Position
  * カーソルより前のトークンの配列(ただし，末尾のトークンがCommaSpace, Space, GR, Label以外の場合そのトークンは除外)
  * を取得
  */
-function getTokensBeforePosition(tokens: Array<TokenInfo>, position: Position): Array<TokenInfo> {
+function getTokensBeforePosition(tokens: TokenInfo[], position: Position): TokenInfo[] {
     const filtered = tokens.filter(x => x.endIndex <= position.character);
     if (filtered.length == 0) {
         return [];
@@ -491,7 +491,7 @@ export function getTokenOfTypeAtPosition(type: TokenType, position: Position): T
     return filtered[filtered.length - 1];
 }
 
-export function getTokensAtPosition(position: Position): Array<TokenInfo> | undefined {
+export function getTokensAtPosition(position: Position): TokenInfo[] | undefined {
     const lineTokens = lastDiagnosticsResult.tokensMap.get(position.line);
     if (lineTokens === undefined) return undefined;
 
@@ -564,7 +564,7 @@ function getScopeFromPosition(position: Position) {
     return getScopeFromLine(position.line);
 }
 
-export function getAllReferenceableLabels(position: Position): Array<TokenInfo> {
+export function getAllReferenceableLabels(position: Position): TokenInfo[] {
     const scope = getScopeFromPosition(position);
     if (scope !== undefined) {
         return lastDiagnosticsResult.labelMap.getAllReferenceableLabels(scope);

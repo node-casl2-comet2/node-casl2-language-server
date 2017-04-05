@@ -4,8 +4,8 @@ import { DocumentHighlight, DocumentHighlightKind, Position } from "vscode-langu
 import { createRangeFromTokenInfo, getAllReferences } from "./core";
 import { TokenInfo } from "@maxfield/node-casl2-core";
 
-export function documentHighlight(uri: string, position: Position): Array<DocumentHighlight> {
-    const noHighlights: Array<DocumentHighlight> = [];
+export function documentHighlight(uri: string, position: Position): DocumentHighlight[] {
+    const noHighlights: DocumentHighlight[] = [];
     const allReferences = getAllReferences(position);
     if (allReferences === undefined) return noHighlights;
 

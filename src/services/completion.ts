@@ -5,9 +5,9 @@ import { instructionsInfo, InstructionInfo, grToString, GR, grsInfo, GRInfo, GRT
 import * as _ from "lodash";
 import { analyzeState, getAllReferenceableLabels, getCurrentState } from "./core";
 
-export const instructionCompletionItems: Array<CompletionItem> = createInstructionCompletionItems();
-export const grCompletionItems: Array<CompletionItem> = createGRCompletionItems(grsInfo);
-export const indexGRCompletionItems: Array<CompletionItem> = createGRCompletionItems(grsInfo.filter(x => x.type & GRType.UsedAsIndexRegister));
+export const instructionCompletionItems: CompletionItem[] = createInstructionCompletionItems();
+export const grCompletionItems: CompletionItem[] = createGRCompletionItems(grsInfo);
+export const indexGRCompletionItems: CompletionItem[] = createGRCompletionItems(grsInfo.filter(x => x.type & GRType.UsedAsIndexRegister));
 
 export enum Completion {
     Instruction,
@@ -18,10 +18,10 @@ export enum Completion {
     None
 }
 
-export function completion(position: Position): Array<CompletionItem> {
+export function completion(position: Position): CompletionItem[] {
     analyzeState(position);
 
-    function labelCompletionItems(): Array<CompletionItem> {
+    function labelCompletionItems(): CompletionItem[] {
         const labels = getAllReferenceableLabels(position).map(x => x.value);
         return createLabelCompletionItems(labels);
     }
@@ -44,7 +44,7 @@ export function completion(position: Position): Array<CompletionItem> {
     return [];
 }
 
-function createInstructionCompletionItems(): Array<CompletionItem> {
+function createInstructionCompletionItems(): CompletionItem[] {
     const items = instructionsInfo.map(convertInstructionInfoToCompletionItem);
     // 重複を除く
     return _.uniqBy(items, x => x.label);
@@ -59,7 +59,7 @@ function createInstructionCompletionItems(): Array<CompletionItem> {
     }
 }
 
-function createGRCompletionItems(grsInfo: Array<GRInfo>): Array<CompletionItem> {
+function createGRCompletionItems(grsInfo: GRInfo[]): CompletionItem[] {
     return grsInfo.map(convertGRInfoToCompletionItem);
 
     function convertGRInfoToCompletionItem(info: GRInfo): CompletionItem {
@@ -71,7 +71,7 @@ function createGRCompletionItems(grsInfo: Array<GRInfo>): Array<CompletionItem> 
     }
 }
 
-export function createLabelCompletionItems(labels: Array<string>): Array<CompletionItem> {
+export function createLabelCompletionItems(labels: string[]): CompletionItem[] {
     return labels.map(convertLabelToCompletionItem);
 
     function convertLabelToCompletionItem(label: string): CompletionItem {

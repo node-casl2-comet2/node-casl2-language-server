@@ -112,4 +112,4 @@ function createAutoFixEdit(fix: Fix): AutoFixEdit {
     };
 
     return edit;
-};
+}

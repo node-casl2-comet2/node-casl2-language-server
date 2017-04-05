@@ -7,8 +7,8 @@ import {
 } from "./core";
 import { TokenType } from "@maxfield/node-casl2-core";
 
-export function gotoDefinition(uri: string, position: Position): Location | Array<Location> {
-    const noDefinitions: Array<Location> = [];
+export function gotoDefinition(uri: string, position: Position): Location | Location[] {
+    const noDefinitions: Location[] = [];
     if (lastDiagnosticsResult === undefined) return noDefinitions;
     // カーソル位置にあるトークンを取得する
     const labelToken = getLabelFromPosition(position);

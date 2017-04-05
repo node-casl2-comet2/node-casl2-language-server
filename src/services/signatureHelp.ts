@@ -21,7 +21,7 @@ export function signatureHelp(uri: string, position: Position): SignatureHelp {
 }
 
 
-function argumentTypeToString(): Array<SignatureInformation> {
+function argumentTypeToString(): SignatureInformation[] {
     const state = getCurrentState();
     const { argumentType, instruction } = state;
     switch (argumentType) {
@@ -81,7 +81,7 @@ function argumentTypeToString(): Array<SignatureInformation> {
         return r;
     }
 
-    function createSignatureInformation(...args: Array<Argument>): SignatureInformation {
+    function createSignatureInformation(...args: Argument[]): SignatureInformation {
         const names = args.map(argumentToString);
         return {
             label: `${instruction} ${names.join(", ")}`,

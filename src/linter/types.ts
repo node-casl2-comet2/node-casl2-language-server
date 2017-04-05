@@ -6,8 +6,8 @@ import { Fix } from "@maxfield/casl2-lint";
 export type AutoFixMap = Map<string, AutoFix>;
 
 export interface AutoFixEdit {
-    range: Range,
-    text: string
+    range: Range;
+    text: string;
 }
 
 export interface AutoFix {

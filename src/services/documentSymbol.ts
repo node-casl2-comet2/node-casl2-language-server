@@ -4,7 +4,7 @@ import { SymbolInformation, SymbolKind, Range, Position } from "vscode-languages
 import { lastDiagnosticsResult, getScopeFromLine, createRangeFromTokenInfo, getCurrentOption } from "./core";
 import { TokenInfo } from "@maxfield/node-casl2-core";
 
-export function documentSymbol(uri: string): Array<SymbolInformation> {
+export function documentSymbol(uri: string): SymbolInformation[] {
     const { subroutineLabels, labels } = lastDiagnosticsResult.labelMap.getAllLabels();
 
     // サブルーチンのシンボル情報を作る

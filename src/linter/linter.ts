@@ -54,7 +54,7 @@ export function codeAction(params: CodeActionParams): Command[] {
     const commands: Command[] = [];
     const { documentVersion } = autofixOfDiagnostic;
 
-    const args = [uri, documentVersion, [createTextEdit(autofixOfDiagnostic)]]
+    const args = [uri, documentVersion, [createTextEdit(autofixOfDiagnostic)]];
     commands.push(Command.create(
         `問題を修正: ${autofixOfDiagnostic.fix.message}`, Commands.ApplySingleFix, ...args
     ));
@@ -69,7 +69,7 @@ export function codeAction(params: CodeActionParams): Command[] {
     }
 
     if (allAutoFixes.length >= 2) {
-        const args = [uri, documentVersion, allAutoFixes.map(createTextEdit)]
+        const args = [uri, documentVersion, allAutoFixes.map(createTextEdit)];
         commands.push(Command.create(
             "すべての問題を修正", Commands.ApplyAllFixes, ...args
         ));
