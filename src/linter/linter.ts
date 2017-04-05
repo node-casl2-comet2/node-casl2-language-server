@@ -25,7 +25,7 @@ export function isEnabled(): boolean {
     return linterEnabled;
 }
 
-export function dispose(uri: string): void {
+export function disposeWorker(uri: string): void {
     linterWokerMap.delete(uri);
 }
 

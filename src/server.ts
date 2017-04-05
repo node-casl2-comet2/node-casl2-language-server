@@ -159,7 +159,7 @@ function triggerLinterAnalysis(document: TextDocument, connection: IConnection) 
 function handleDocumentClose(change: TextDocumentChangeEvent): void {
     const uri = change.document.uri;
 
-    linter.dispose(uri);
+    linter.disposeWorker(uri);
 
     // ファイルが閉じられた時にそのファイルのDiagnosticsを空にする
     connection.sendDiagnostics({ uri: uri, diagnostics: [] });
