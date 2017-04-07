@@ -39,9 +39,23 @@ export class LinterWoker {
         this._documentVersion = document.version;
     }
 
-    public diagnoseSource(): void {
-        // 診断済みならば何もしない
-        if (this._lastDiagnoseDocumentVersion == this._documentVersion) return;
+    public diagnoseSource = () => this._diagnoseSource(false);
+
+
+    // CASL2の設定が変更された場合など,
+    // Document versionが変わっていなくても
+    // 再診断する必要がある場合に使う
+    public forceDiagnoseSource = () => this._diagnoseSource(true);
+
+    /**
+     * Diagnose source and record diagnostics and getAllAutoFixes
+     * @param force Force diagnose flag
+     */
+    private _diagnoseSource(force: boolean): void {
+        if (!force) {
+            // 診断済みならば何もしない
+            if (this._lastDiagnoseDocumentVersion == this._documentVersion) return;
+        }
 
         // ファイル作成直後にそのファイルが存在しないという
         // エラーになるのを回避する

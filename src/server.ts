@@ -108,8 +108,11 @@ connection.onDidChangeConfiguration((change) => {
     const linterEnabled = newCasl2Options.linter !== undefined && newCasl2Options.linter.enabled;
     linter.setEnabled(linterEnabled);
 
-    // すべてのファイルを再検証する
-    documents.all().forEach(document => triggerLinterAnalysis(document, connection));
+    // すべてのファイルを即座に再検証する
+    documents.all().forEach(document => {
+        validateTextDocument(document);
+        linterDiagnoseSource(document, connection, true);
+    });
 });
 
 // CodeAction時に呼ばれる
@@ -130,27 +133,31 @@ connection.listen();
 const subject = new Rx.Subject<[TextDocument, IConnection]>();
 subject
     .debounceTime(200)
-    .subscribe(([document, connection]) => {
-        const { uri } = document;
+    .subscribe(([document, connection]) => linterDiagnoseSource(document, connection));
 
-        const languageServiceDiagnostics = getCurrenctDiagnostics();
-        const linterDiagnostics = getLinterDiagnostics();
-        const diagnostics = languageServiceDiagnostics.concat(linterDiagnostics);
+function linterDiagnoseSource(document: TextDocument, connection: IConnection, forceDiagnose = false) {
+    const { uri } = document;
 
-        connection.sendDiagnostics({ uri, diagnostics });
+    const languageServiceDiagnostics = getCurrenctDiagnostics();
+    const linterDiagnostics = getLinterDiagnostics();
+    const diagnostics = languageServiceDiagnostics.concat(linterDiagnostics);
 
-        function getLinterDiagnostics() {
-            const worker = linter.getWorker(document.uri);
-            worker.loadDocument(document);
+    connection.sendDiagnostics({ uri, diagnostics });
 
-            if (linter.isEnabled()) {
-                worker.diagnoseSource();
-                return worker.diagnostics;
-            } else {
-                return [];
-            }
+    function getLinterDiagnostics() {
+        const worker = linter.getWorker(document.uri);
+        worker.loadDocument(document);
+
+        if (linter.isEnabled()) {
+            forceDiagnose
+                ? worker.forceDiagnoseSource()
+                : worker.diagnoseSource();
+            return worker.diagnostics;
+        } else {
+            return [];
         }
-    });
+    }
+}
 
 function triggerLinterAnalysis(document: TextDocument, connection: IConnection) {
     subject.next([document, connection]);
